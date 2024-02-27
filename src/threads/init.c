@@ -71,7 +71,12 @@ static void locate_block_device (enum block_type, const char *name);
 #endif
 
 int pintos_init (void) NO_RETURN;
-
+/*
+ * Use Pintos `input_getc` to read a character
+ * return the length of the command string, 0 indicate error
+ */
+int shell_read(char* buffer);
+#define BUFFER_SIZE 100
 /** Pintos main entry point. */
 int
 pintos_init (void)
@@ -133,13 +138,49 @@ pintos_init (void)
     /* Run actions specified on kernel command line. */
     run_actions (argv);
   } else {
-    // TODO: no command line passed to kernel. Run interactively 
+    // TODO: no command line passed to kernel. Run interactively
+      while(true) {
+          printf("PKUOS> ");
+          char command[BUFFER_SIZE]={0};
+          if(shell_read(command)){
+              if(strcmp(command, "whoami") == 0) {
+                  printf("2200013141\n");
+              } else if(strcmp(command, "exit") == 0) {
+                  break;
+              }
+          }
+          else {
+              printf("Invalid command\n");
+          }
+      }
   }
 
   /* Finish up. */
   shutdown ();
   thread_exit ();
 }
+
+int shell_read(char* buffer) {
+    int i = 0;
+    while (i < BUFFER_SIZE - 1) {
+        /* Use Pintos `input_getc` to read a character */
+        uint8_t c = input_getc();
+        if (c == '\r'|| c == '\n') {
+            printf("\n");
+            buffer[i] = '\0';
+            break;
+        } else if (c >= 32 && c <= 126) {  /* Only save and display printable characters */
+            buffer[i] = c;
+            i++;
+            printf("%c",c);
+        } else{
+            /* Illegal character is not required  */
+            return 0;
+        }
+    }
+    return strlen(buffer);
+}
+
 
 /** Clear the "BSS", a segment that should be initialized to
    zeros.  It isn't actually stored on disk or zeroed by the
