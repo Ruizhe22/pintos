@@ -147,6 +147,8 @@ pintos_init (void)
                   printf("2200013141\n");
               } else if(strcmp(command, "exit") == 0) {
                   break;
+              } else{
+                  printf("Invalid command\n");
               }
           }
           else {
