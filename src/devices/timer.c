@@ -94,17 +94,18 @@ timer_elapsed(int64_t then) {
    be turned on. */
 void
 timer_sleep(int64_t ticks) {
-    int64_t start = timer_ticks();
-    if(ticks<=0) return;
 
-    struct sema_timer st;
+    int64_t start = timer_ticks();
     enum intr_level old_level = intr_disable();
+    if(ticks<=0) return;
+    struct sema_timer st;
+
     sema_timer_init(start, ticks, &st);
     list_push_back(&sema_timer_list, &st.elem);
     sema_down(&st.semaphore);
     intr_set_level(old_level);
-    ASSERT(intr_get_level() == INTR_ON);
     /*
+    ASSERT(intr_get_level() == INTR_ON);
     while (timer_elapsed (start) < ticks)
       thread_yield ();
     */
@@ -187,12 +188,15 @@ timer_interrupt(struct intr_frame *args UNUSED) {
 static void
 check_sema_timers(){
     struct list_elem *e;
-    for (e = list_begin(&sema_timer_list); e != list_end(&sema_timer_list); e = list_next (e))
+    struct list_elem *ne;
+    for (e = list_begin(&sema_timer_list); e != list_end(&sema_timer_list); e = ne)
     {
+        ne = list_next (e);
         struct sema_timer *st = list_entry (e, struct sema_timer, elem);
         if(ticks >= st->start + st->sleep){
             list_remove(e);
             sema_up(&st->semaphore);
+            //intr_yield_on_return();
         }
     }
 }
@@ -271,4 +275,11 @@ sema_timer_init(int64_t start, int64_t sleep, struct sema_timer *pst) {
     pst->sleep = sleep;
     pst->start = start;
     sema_init(&pst->semaphore, 0);
+}
+
+bool list_timer_less(const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux){
+    return (list_entry(a,struct sema_timer,elem)->start + list_entry(a,struct sema_timer,elem)->sleep) <=
+            (list_entry(b,struct sema_timer,elem)->start + list_entry(b,struct sema_timer,elem)->sleep);
 }

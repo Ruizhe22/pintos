@@ -118,6 +118,7 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+void thread_check_priority_yield(struct thread *t);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
@@ -132,6 +133,10 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+
+bool thread_list_priority_less (const struct list_elem *a,
+                                const struct list_elem *b,
+                                void *aux);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

@@ -34,4 +34,9 @@ struct sema_timer{
     struct semaphore semaphore;
     struct list_elem elem;
 };
+
+bool list_timer_less(const struct list_elem *a,
+                     const struct list_elem *b,
+                     void *aux);
+
 #endif /**< devices/timer.h */

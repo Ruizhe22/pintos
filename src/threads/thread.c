@@ -75,6 +75,7 @@ static bool is_thread(struct thread *)UNUSED;
                                       void thread_schedule_tail(struct thread *prev);
                                       static tid_t allocate_tid(void);
 
+
 /** Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -137,8 +138,10 @@ thread_tick(void) {
         kernel_ticks++;
 
     /* Enforce preemption. */
-    if (++thread_ticks >= TIME_SLICE)
-        intr_yield_on_return();
+    //if (++thread_ticks >= TIME_SLICE)
+    //    intr_yield_on_return();
+
+    //thread_check_priority_yield(NULL);
 }
 
 /** Prints thread statistics. */
@@ -200,7 +203,7 @@ thread_create(const char *name, int priority,
 
     /* Add to run queue. */
     thread_unblock(t);
-
+    thread_check_priority_yield(t);
     return tid;
 }
 
@@ -326,8 +329,14 @@ thread_foreach(thread_action_func *func, void *aux) {
 /** Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority(int new_priority) {
-    thread_current()->priority = new_priority;
-    if
+    if(thread_current()->priority <= new_priority){
+        thread_current()->priority = new_priority;
+    }
+    else{
+        thread_current()->priority = new_priority;
+        thread_check_priority_yield(NULL);
+    }
+
 }
 
 /** Returns the current thread's priority. */
@@ -471,9 +480,13 @@ static struct thread *
 next_thread_to_run(void) {
     if (list_empty(&ready_list))
         return idle_thread;
-    else
-        return list_entry(list_pop_front(&ready_list),
-    struct thread, elem);
+    else{
+        struct list_elem *max_elem = list_max(&ready_list, thread_list_priority_less, NULL);
+        list_remove(max_elem);
+        return list_entry(max_elem,struct thread, elem);
+        //return list_entry (list_pop_back (&ready_list), struct thread, elem);
+    }
+
 }
 
 /** Completes a thread switch by activating the new thread's page
@@ -557,5 +570,26 @@ allocate_tid(void) {
 
 /** Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
-uint32_t thread_stack_ofs = offsetof(
-struct thread, stack);
+uint32_t thread_stack_ofs = offsetof(struct thread, stack);
+
+bool thread_list_priority_less (const struct list_elem *a,
+                     const struct list_elem *b,
+                     void *aux){
+    return (list_entry(a,struct thread,elem)->priority) < (list_entry(b,struct thread,elem)->priority);
+}
+
+void thread_check_priority_yield(struct thread *t){
+    if(t == NULL){
+        t = list_entry(list_max(&ready_list, thread_list_priority_less, NULL),struct thread, elem);
+    }
+    if(t->priority > thread_current()->priority){
+        if(intr_context()){
+            intr_yield_on_return();
+        }
+        else{
+            thread_yield();
+        }
+    }
+
+
+}
