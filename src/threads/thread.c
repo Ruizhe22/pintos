@@ -70,10 +70,10 @@ static struct thread *next_thread_to_run(void);
 static void init_thread(struct thread *, const char *name, int priority);
 
 static bool is_thread(struct thread *)UNUSED;
-                                      static void *alloc_frame(struct thread *, size_t size);
-                                      static void schedule(void);
-                                      void thread_schedule_tail(struct thread *prev);
-                                      static tid_t allocate_tid(void);
+static void *alloc_frame(struct thread *, size_t size);
+static void schedule(void);
+void thread_schedule_tail(struct thread *prev);
+static tid_t allocate_tid(void);
 
 
 /** Initializes the threading system by transforming the code
@@ -89,8 +89,8 @@ static bool is_thread(struct thread *)UNUSED;
 
    It is not safe to call thread_current() until this function
    finishes. */
-        void
-        thread_init(void)
+void
+thread_init(void)
 {
     ASSERT(intr_get_level() == INTR_OFF);
 
@@ -138,8 +138,8 @@ thread_tick(void) {
         kernel_ticks++;
 
     /* Enforce preemption. */
-    //if (++thread_ticks >= TIME_SLICE)
-    //    intr_yield_on_return();
+    if (++thread_ticks >= TIME_SLICE)
+        intr_yield_on_return();
 
     //thread_check_priority_yield(NULL);
 }
@@ -329,20 +329,25 @@ thread_foreach(thread_action_func *func, void *aux) {
 /** Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority(int new_priority) {
-    if(thread_current()->priority <= new_priority){
-        thread_current()->priority = new_priority;
+    if(thread_current()->priority_with_donations == thread_current()->priority){
+        thread_current()->priority_with_donations = new_priority;
     }
-    else{
+    if(thread_current()->priority > new_priority){
         thread_current()->priority = new_priority;
         thread_check_priority_yield(NULL);
     }
+    else{
+        thread_current()->priority = new_priority;
+    }
+
+
 
 }
 
 /** Returns the current thread's priority. */
 int
 thread_get_priority(void) {
-    return thread_current()->priority;
+    return thread_current()->priority_with_donations;
 }
 
 /** Sets the current thread's nice value to NICE. */
@@ -452,7 +457,10 @@ init_thread(struct thread *t, const char *name, int priority) {
     strlcpy(t->name, name, sizeof t->name);
     t->stack = (uint8_t *) t + PGSIZE;
     t->priority = priority;
+    t->priority_with_donations = priority;
+    t->lock_wait = NULL;
     t->magic = THREAD_MAGIC;
+    list_init(&t->locks_hold);
 
     old_level = intr_disable();
     list_push_back(&all_list, &t->allelem);
@@ -575,14 +583,14 @@ uint32_t thread_stack_ofs = offsetof(struct thread, stack);
 bool thread_list_priority_less (const struct list_elem *a,
                      const struct list_elem *b,
                      void *aux){
-    return (list_entry(a,struct thread,elem)->priority) < (list_entry(b,struct thread,elem)->priority);
+    return (list_entry(a,struct thread,elem)->priority_with_donations) < (list_entry(b,struct thread,elem)->priority_with_donations);
 }
 
 void thread_check_priority_yield(struct thread *t){
     if(t == NULL){
         t = list_entry(list_max(&ready_list, thread_list_priority_less, NULL),struct thread, elem);
     }
-    if(t->priority > thread_current()->priority){
+    if(t->priority_with_donations > thread_current()->priority_with_donations){
         if(intr_context()){
             intr_yield_on_return();
         }
@@ -590,6 +598,4 @@ void thread_check_priority_yield(struct thread *t){
             thread_yield();
         }
     }
-
-
 }

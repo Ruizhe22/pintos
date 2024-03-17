@@ -185,8 +185,7 @@ timer_interrupt(struct intr_frame *args UNUSED) {
     thread_tick();
 }
 
-static void
-check_sema_timers(){
+static void check_sema_timers(){
     struct list_elem *e;
     struct list_elem *ne;
     for (e = list_begin(&sema_timer_list); e != list_end(&sema_timer_list); e = ne)
