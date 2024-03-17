@@ -522,3 +522,11 @@ list_min (struct list *list, list_less_func *less, void *aux)
     }
   return min;
 }
+
+void list_apply(struct list *list,list_apply_func *f, void *aux ){
+    struct list_elem *e;
+    for (e = list_begin (list); e != list_end (list); e = list_next (e))
+    {
+        f(e,aux);
+    }
+}

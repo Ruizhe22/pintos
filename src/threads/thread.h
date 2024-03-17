@@ -24,6 +24,30 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /**< Default priority. */
 #define PRI_MAX 63                      /**< Highest priority. */
 
+/* Nice value boundary */
+#define NICE_MIN -20
+#define NICE_INITIAL 0
+#define NICE_MAX 20
+/* recent_cpu in the begining */
+#define RECENT_CPU_INITIAL 0
+#define FRACTION 16384
+
+/* Fixed-point real arithmetic */
+/* Here x and y are fixed-point number, n is an integer */
+#define CONVERT_TO_FP(n) ((n) * (FRACTION))
+#define CONVERT_TO_INT_ZERO(x) ((x) / (FRACTION))
+#define CONVERT_TO_INT_NEAREST(x) ((x) >= 0 ? ((x) + (FRACTION) / 2)\
+                                   / (FRACTION) : ((x) - (FRACTION) / 2)\
+                                   / (FRACTION))
+#define ADD_X_Y(x, y) ((x) + (y))
+#define SUB_X_Y(x, y) ((x) - (y))
+#define ADD_X_N(x, n) ((x) + (n) * (FRACTION))
+#define SUB_X_N(x, n) ((x) - (n) * (FRACTION))
+#define MULTIPLE_X_Y(x, y) (((int64_t)(x)) * (y) / (FRACTION))
+#define MULTIPLE_X_N(x, n) ((x) * (n))
+#define DIVIDE_X_Y(x, y) (((int64_t)(x)) * (FRACTION) / (y))
+#define DIVIDE_X_N(x, n) ((x) / (n))
+
 /** A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -87,8 +111,8 @@ struct thread
     enum thread_status status;          /**< Thread state. */
     char name[16];                      /**< Name (for debugging purposes). */
     uint8_t *stack;                     /**< Saved stack pointer. */
-    int priority;                       /**< Original Priority.only change when thread_set_priority */
-    int priority_with_donations;        /**< default equals to priority, when donation occurs, update this value, the max donation */
+    int priority_origin;                       /**< Original Priority.only change when thread_set_priority only use in donations */
+    int priority;        /**< default equals to priority, when donation occurs, update this value, the max donation */
     struct lock *lock_wait;             /**< Lock the thread requests using for nested donate */
     struct list locks_hold;             /**< List of locks, lock element in synch.h */
 
@@ -96,6 +120,9 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /**< List element. */
+
+    int nice;                             /* Thread nice value */
+    int recent_cpu;                       /* Thread recent CPU */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -141,10 +168,15 @@ void thread_set_priority (int);
 bool thread_list_priority_less (const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux);
-
+bool thread_alllist_priority_less (const struct list_elem *a,
+                                   const struct list_elem *b,
+                                   void *aux);
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+void calculate_load_avg (void);
+void calculate_recent_cpu (struct list_elem *e, void *aux UNUSED);
+void calculate_priority (struct list_elem *e, void *aux UNUSED);
 #endif /**< threads/thread.h */

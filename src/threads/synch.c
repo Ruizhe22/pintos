@@ -170,7 +170,7 @@ sema_test_helper(void *sema_) {
 void
 lock_init(struct lock *lock) {
     ASSERT(lock != NULL);
-    lock->priority_with_donations = -1;
+    lock->priority = -1;
     lock->holder = NULL;
     sema_init(&lock->semaphore, 1);
 }
@@ -192,7 +192,7 @@ lock_acquire(struct lock *lock) {
     thread_current()->lock_wait = lock;
     donate(lock, thread_current());
     sema_down(&lock->semaphore);
-    lock->priority_with_donations = thread_current()->priority;
+    lock->priority = thread_current()->priority_origin;
     thread_current()->lock_wait = NULL;
     lock->holder = thread_current();
     list_push_back(&thread_current()->locks_hold, &lock->elem);
@@ -230,7 +230,7 @@ lock_release(struct lock *lock) {
     ASSERT(lock_held_by_current_thread(lock));
 
     recall_donates(lock);
-    lock->priority_with_donations = -1;
+    lock->priority = -1;
     lock->holder = NULL;
     sema_up(&lock->semaphore);
 
@@ -338,24 +338,24 @@ cond_broadcast(struct condition *cond, struct lock *lock) {
 void donate(struct lock *l, struct thread *requester){
     if(l->holder == NULL) return;
     //enum intr_level old_level = intr_disable();
-    if(l->priority_with_donations < requester->priority_with_donations){
+    if(l->priority < requester->priority){
 
-        l->priority_with_donations = requester->priority_with_donations;
+        l->priority = requester->priority;
 
         // update the priority of lock holder
-        l->holder->priority_with_donations = requester->priority_with_donations;
+        l->holder->priority = requester->priority;
         //if holder wait another lock
         int times = 8;
         while(l->holder->lock_wait && times){
             requester = l->holder;
             l = l->holder->lock_wait;
 
-            if(l->priority_with_donations < requester->priority_with_donations) {
+            if(l->priority < requester->priority) {
 
-                l->priority_with_donations = requester->priority_with_donations;
+                l->priority = requester->priority;
 
                 // update the priority of lock holder
-                l->holder->priority_with_donations = requester->priority_with_donations;
+                l->holder->priority = requester->priority;
             }
             --times;
         }
@@ -368,10 +368,10 @@ void recall_donates(struct lock *l){
     //enum intr_level old_level = intr_disable();
     list_remove(&l->elem);
     if(!list_empty(&l->holder->locks_hold)){
-        l->holder->priority_with_donations = list_entry(list_max(&l->holder->locks_hold, lock_list_priority_less, NULL), struct lock, elem)->priority_with_donations;
+        l->holder->priority = list_entry(list_max(&l->holder->locks_hold, lock_list_priority_less, NULL), struct lock, elem)->priority;
     }
     else{
-        l->holder->priority_with_donations = l->holder->priority;
+        l->holder->priority = l->holder->priority_origin;
     }
     //intr_set_level(old_level);
 
@@ -380,7 +380,7 @@ void recall_donates(struct lock *l){
 bool lock_list_priority_less (const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux){
-    return (list_entry(a,struct lock, elem)->priority_with_donations) < (list_entry(b,struct lock,elem)->priority_with_donations);
+    return (list_entry(a,struct lock, elem)->priority) < (list_entry(b,struct lock,elem)->priority);
 }
 
 bool cond_list_priority_less (const struct list_elem *a, const struct list_elem *b, void *aux){

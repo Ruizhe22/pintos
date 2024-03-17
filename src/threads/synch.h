@@ -30,7 +30,7 @@ struct lock
   {
     struct thread *holder;      /**< Thread holding lock (for debugging). */
     struct semaphore semaphore; /**< Binary semaphore controlling access. */
-    int priority_with_donations;
+    int priority;
     struct list_elem elem;
   };
 

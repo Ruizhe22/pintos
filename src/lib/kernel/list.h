@@ -166,6 +166,7 @@ typedef bool list_less_func (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux);
 
+typedef void list_apply_func(struct list_elem *a, void *aux);
 /** Operations on lists with ordered elements. */
 void list_sort (struct list *,
                 list_less_func *, void *aux);
@@ -177,5 +178,7 @@ void list_unique (struct list *, struct list *duplicates,
 /** Max and min. */
 struct list_elem *list_max (struct list *, list_less_func *, void *aux);
 struct list_elem *list_min (struct list *, list_less_func *, void *aux);
+
+void list_apply(struct list *,list_apply_func *, void *aux );
 
 #endif /**< lib/kernel/list.h */
