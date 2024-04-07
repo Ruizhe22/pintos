@@ -143,7 +143,7 @@ sys_exit(struct intr_frame *f)
     }
 }
 
-inline pid_t
+inline tid_t
 exec(const char *file)
 {
     return process_execute(file);
@@ -164,7 +164,7 @@ static void sys_exec(struct intr_frame *f)
 }
 
 inline int
-wait(pid_t pid)
+wait(tid_t pid)
 {
     return process_wait(pid);
 }

@@ -92,8 +92,8 @@ static bool is_thread(struct thread *)UNUSED;
 
    It is not safe to call thread_current() until this function
    finishes. */
-void
-thread_init(void)
+        void
+        thread_init(void)
 {
     ASSERT(intr_get_level() == INTR_OFF);
 
@@ -293,13 +293,14 @@ thread_exit(void) {
        and schedule another process.  That process will destroy us
        when it calls thread_schedule_tail(). */
     intr_disable();
-    list_remove(&thread_current()->allelem);
-    thread_current()->status = THREAD_DYING;
-    thread_current()->as_child->exited = true;
-    sema_up(&thread_current()->as_child->sema);
+    struct thread *cur = thread_current();
+    list_remove(&cur->allelem);
+    cur->status = THREAD_DYING;
+    cur->as_child->exited = true;
+    sema_up(&cur->as_child->sema);
 
-    struct list_elem *e, ne;
-    struct  list *l = &thread_current()->children;
+    struct list_elem *e, *ne;
+    struct  list *l = &cur->children;
     for (e = list_begin (l); e != list_end (l); e = ne)
     {
         struct child *f = list_entry (e, struct child, elem);
@@ -313,8 +314,8 @@ thread_exit(void) {
         }
     }
 
-    if(thread_current()->as_child->parent_exited){
-        free(thread_current()->as_child);
+    if(cur->as_child->parent_exited){
+        free(cur->as_child);
     }
 
     schedule();
@@ -474,7 +475,6 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->stack = (uint8_t *) t + PGSIZE;
     t->priority = priority;
     t->magic = THREAD_MAGIC;
-    t->parent = thread_current();
     t->file_num = 2;
     list_init(&t->children);
     old_level = intr_disable();

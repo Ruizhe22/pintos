@@ -97,7 +97,6 @@ struct thread {
     uint32_t *pagedir;                  /**< Page directory. */
 
 #endif
-    struct thread *parent;
     struct list children;
     struct child *as_child;
     int file_num;

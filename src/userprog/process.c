@@ -60,7 +60,7 @@ process_execute(const char *cmd_line) {
         /* check if load success */
         sema_down(&ch->sema);
         if(!ch->load_success){
-            list_remove(ch->elem);
+            list_remove(&ch->elem);
             free(ch);
         }
     }
@@ -113,17 +113,17 @@ start_process(void *cmd_line_copy_) {
 int
 process_wait(tid_t child_tid) {
     struct child *ch = find_child(child_tid);
-    if(ch.waited) return -1;
+    if(ch->waited) return -1;
     sema_down(&ch->sema);
     int exit_status = ch->terminate_by_exit? ch->status_code : -1;
     list_remove(&ch->elem);
     free(ch);
+    return exit_status;
 }
 
 /** not find return NULL */
 static struct child *
 find_child(tid_t child_tid) {
-    if(child_tid)
     struct list_elem *e;
     struct  list *l = &thread_current()->children;
     for (e = list_begin (l); e != list_end (l); e = list_next (e))
@@ -474,19 +474,19 @@ setup_stack(char *file_name, char *cmd_arg, void **esp) {
             for (arg = strtok_r(cmd_arg, " ", &save_ptr); arg != NULL; arg = strtok_r(NULL, " ", &save_ptr)) {
                 ++argc;
                 arg_size[argc] = arg_size[argc - 1] + strlen(arg) + 1;
-                *esp = PHYS_BASE - arg_size[argc]
+                *esp = PHYS_BASE - arg_size[argc];
                 memcpy(*esp, arg, strlen(arg) + 1);
             }
             ++argc;
             /* word align and argv[argc]*/
-            *esp = *esp / 4 * 4 - 4 * (argc + 4);
+            *esp = (unsigned)(*esp) / 4 * 4 - 4 * (argc + 4);
             memset(*esp, 0, 4);
-            (int *) (*esp + 4) = argc;
-            (char **) (*esp + 8) = *esp + 12;
+            *(int *) (*esp + 4) = argc;
+            *(char **) (*esp + 8) = *esp + 12;
             for (int i = 0; i < argc; ++i) {
-                (char *) (*esp + 12 + i * 4) = PHYS_BASE - arg_size[i];
+                *(char *) (*esp + 12 + i * 4) = PHYS_BASE - arg_size[i];
             }
-            (char *) (*esp + 12 + argc * 4) = 0;
+            *(char *) (*esp + 12 + argc * 4) = 0;
 
             palloc_free_page(arg_size);
         } else
