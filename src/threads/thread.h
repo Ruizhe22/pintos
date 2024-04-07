@@ -101,6 +101,7 @@ struct thread {
     struct child *as_child;
     int file_num;
     struct list fd_set;
+    struct file *executable;
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
 };

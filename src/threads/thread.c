@@ -12,7 +12,8 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
-
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -294,13 +295,25 @@ thread_exit(void) {
        when it calls thread_schedule_tail(). */
     intr_disable();
     struct thread *cur = thread_current();
+    struct list_elem *e, *ne;
+    struct  list *l;
+    l = &cur->fd_set;
+    for (e = list_begin (l); e != list_end (l); e = ne)
+    {
+        struct file_descriptor *f = list_entry (e, struct file_descriptor, elem);
+        ne = list_next (e);
+        list_remove(e);
+        file_close(f->file_ptr);
+        free(f);
+    }
+
     list_remove(&cur->allelem);
     cur->status = THREAD_DYING;
     cur->as_child->exited = true;
     sema_up(&cur->as_child->sema);
 
-    struct list_elem *e, *ne;
-    struct  list *l = &cur->children;
+
+    l = &cur->children;
     for (e = list_begin (l); e != list_end (l); e = ne)
     {
         struct child *f = list_entry (e, struct child, elem);
@@ -313,6 +326,7 @@ thread_exit(void) {
             f->parent_exited = true;
         }
     }
+
 
     if(cur->as_child->parent_exited){
         free(cur->as_child);
@@ -477,6 +491,8 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->magic = THREAD_MAGIC;
     t->file_num = 2;
     list_init(&t->children);
+    list_init(&t->fd_set);
+    t->executable = NULL;
     old_level = intr_disable();
     list_push_back(&all_list, &t->allelem);
     intr_set_level(old_level);

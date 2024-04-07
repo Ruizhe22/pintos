@@ -12,10 +12,9 @@
 #include "lib/kernel/stdio.h"
 
 static void syscall_handler(struct intr_frame *);
-static int get_user (const uint8_t *);
-static bool put_user (uint8_t *, uint8_t);
-static bool get_byte_valid(const uint8_t *);
-static bool put_byte_valid(uint8_t *, uint8_t );
+
+static bool check_pointer(const void *);
+
 
 void
 syscall_init(void) {
@@ -55,58 +54,35 @@ static void (*syscalls[])(struct intr_frame *) = {
 static void
 syscall_handler(struct intr_frame *f) {
     int num;
-    if(get_byte_valid(f->esp)){
+    if(check_pointer(f->esp)){
         num = *(int *)(f->esp);
         if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
             syscalls[num](f);
         }
         else{
-            f->eax = -1;
+           exit(-1);
         }
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
-/* Reads a byte at user virtual address UADDR.
-   UADDR must be below PHYS_BASE.
-   Returns the byte value if successful, -1 if a segfault
-   occurred. */
-static int
-get_user (const uint8_t *uaddr)
+static bool
+check_pointer(const void *vaddr)
 {
-    int result;
-    asm ("movl $1f, %0; movzbl %1, %0; 1:"
-            : "=&a" (result) : "m" (*uaddr));
-    return result;
+    if (!is_user_vaddr(vaddr))
+    {
+        return false;
+    }
+    void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
+    if (!ptr)
+    {
+        return false;
+    }
+    return true;
 }
 
-/* Writes BYTE to user address UDST.
-   UDST must be below PHYS_BASE.
-   Returns true if successful, false if a segfault occurred. */
-static bool
-put_user (uint8_t *udst, uint8_t byte)
-{
-    int error_code;
-    asm ("movl $1f, %0; movb %b2, %1; 1:"
-            : "=&a" (error_code), "=m" (*udst) : "q" (byte));
-    return error_code != -1;
-}
-
-static bool
-get_byte_valid(const uint8_t *uaddr)
-{
-    if(!is_user_vaddr (uaddr)) return 0;
-    return get_user(uaddr)!=-1;
-}
-
-static bool
-put_byte_valid(uint8_t *udst, uint8_t byte)
-{
-    if(!is_user_vaddr (udst)) return 0;
-    return put_user(udst,byte);
-}
 
 /** Projects 2 and later. */
 
@@ -135,11 +111,11 @@ static void
 sys_exit(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(get_byte_valid(arg)){
+    if(check_pointer(arg)){
         exit(*arg);
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -153,13 +129,13 @@ static void sys_exec(struct intr_frame *f)
 {
     char **arg = f->esp + 4;
 
-    if(get_byte_valid(arg) && get_byte_valid(*arg)){
+    if(check_pointer(arg) && check_pointer(*arg)){
         filesys_lock_acquire();
         f->eax = exec(*arg);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -172,11 +148,11 @@ wait(tid_t pid)
 static void sys_wait(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(get_byte_valid(arg)){
+    if(check_pointer(arg)){
         f->eax = wait(*arg);
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -191,13 +167,13 @@ sys_create(struct intr_frame *f)
 {
     char **arg1 = f->esp + 4;
     unsigned *arg2 = f->esp + 8;
-    if(get_byte_valid(arg1) && get_byte_valid(*arg1) && get_byte_valid(arg2)){
+    if(check_pointer(arg1) && check_pointer(*arg1) && check_pointer(arg2)){
         filesys_lock_acquire();
         f->eax = create(*arg1, *arg2);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -211,13 +187,13 @@ static void
 sys_remove(struct intr_frame *f)
 {
     char **arg = f->esp + 4;
-    if(get_byte_valid(arg) && get_byte_valid(*arg)){
+    if(check_pointer(arg) && check_pointer(*arg)){
         filesys_lock_acquire();
         f->eax = remove(*arg);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -225,20 +201,21 @@ int
 open(const char *file)
 {
     struct file *file_ptr = filesys_open(file);
-    struct file_descriptor filedescriptor;
-    return fd_init(&filedescriptor, file_ptr);
+    if(!file_ptr) return -1;
+    struct file_descriptor *filedescriptor = (struct file_descriptor *)malloc(sizeof(struct file_descriptor));
+    return fd_init(filedescriptor, file_ptr);
 }
 
 static void sys_open(struct intr_frame *f)
 {
     char **arg = f->esp + 4;
-    if(get_byte_valid(arg) && get_byte_valid(*arg)){
+    if(check_pointer(arg) && check_pointer(*arg)){
         filesys_lock_acquire();
         f->eax = open(*arg);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -246,20 +223,20 @@ inline int
 filesize(int fd)
 {
     struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) return -1;
+    if(!fileDescriptor) exit(-1);
     return file_length(fileDescriptor->file_ptr);
 }
 
 static void sys_filesize(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(get_byte_valid(arg)){
+    if(check_pointer(arg)){
         filesys_lock_acquire();
         f->eax = filesize(*arg);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 
 }
@@ -275,7 +252,7 @@ read(int fd, void *buffer, unsigned length)
     }
     else{
         struct file_descriptor *fileDescriptor = fd_find(fd);
-        if(!fileDescriptor) return -1;
+        if(!fileDescriptor) exit(-1);
         return file_read(fileDescriptor->file_ptr, buffer, length);
     }
 }
@@ -287,13 +264,13 @@ sys_read(struct intr_frame *f)
     void **arg2 = f->esp + 8;
     unsigned *arg3 = f->esp + 12;
 
-    if(get_byte_valid(arg1) && get_byte_valid(arg2) && get_byte_valid(arg3) && get_byte_valid(*arg3) ){
+    if(check_pointer(arg1) && check_pointer(arg2) && check_pointer(*arg2) && check_pointer(arg3) ){
         filesys_lock_acquire();
         f->eax = read(*arg1, *arg2, *arg3);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -306,7 +283,7 @@ write(int fd, const void *buffer, unsigned length)
     }
     else{
         struct file_descriptor *fileDescriptor = fd_find(fd);
-        if(!fileDescriptor) return -1;
+        if(!fileDescriptor) exit(-1);
         return file_write(fileDescriptor->file_ptr, buffer, length);
     }
 }
@@ -318,13 +295,13 @@ sys_write(struct intr_frame *f)
     void **arg2 = f->esp + 8;
     unsigned *arg3 = f->esp + 12;
 
-    if(get_byte_valid(arg1) && get_byte_valid(arg2) && get_byte_valid(arg3) && get_byte_valid(*arg3) ){
+    if(check_pointer(arg1) && check_pointer(arg2) && check_pointer(*arg2) && check_pointer(arg3) ){
         filesys_lock_acquire();
         f->eax = write(*arg1, *arg2, *arg3);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -332,8 +309,8 @@ void
 seek(int fd, unsigned position)
 {
     struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) return;
-    return file_seek(fileDescriptor->file_ptr, position);
+    if(!fileDescriptor) exit(-1);;
+    file_seek(fileDescriptor->file_ptr, position);
 }
 
 static void
@@ -341,13 +318,13 @@ sys_seek(struct intr_frame *f)
 {
     int *arg1 = f->esp + 4;
     unsigned *arg2 = f->esp + 8;
-    if(get_byte_valid(arg1) && get_byte_valid(arg2)){
+    if(check_pointer(arg1) && check_pointer(arg2)){
         filesys_lock_acquire();
         seek(*arg1, *arg2);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
@@ -355,7 +332,7 @@ unsigned
 tell(int fd)
 {
     struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) return -1;
+    if(!fileDescriptor) exit(-1);;
     return file_tell(fileDescriptor->file_ptr);
 }
 
@@ -363,34 +340,37 @@ static void
 sys_tell(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(get_byte_valid(arg)){
+    if(check_pointer(arg)){
         filesys_lock_acquire();
         f->eax = tell(*arg);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }
 
 void
 close(int fd)
 {
-    struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) return;
-    return file_close(fileDescriptor->file_ptr);
+    struct file_descriptor *filedescriptor = fd_find(fd);
+    if(!filedescriptor) return;
+    file_close(filedescriptor->file_ptr);
+    list_remove(&filedescriptor->elem);
+    free(filedescriptor);
+
 }
 
 static void
 sys_close(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(get_byte_valid(arg)){
+    if(check_pointer(arg)){
         filesys_lock_acquire();
         close(*arg);
         filesys_lock_release();
     }
     else{
-        f->eax = -1;
+        exit(-1);
     }
 }

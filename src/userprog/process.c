@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process
 NO_RETURN;
@@ -49,6 +50,9 @@ process_execute(const char *cmd_line) {
         return TID_ERROR;
     strlcpy(cmd_head, cmd_line, PGSIZE);
     cmd_head = strtok_r(cmd_head, " ", &save_ptr);
+    struct file *file;
+    if(!(file = filesys_open(cmd_head))) return -1;
+    file_close(file);
     /* Create a new thread to execute cmd_line. */
     tid = thread_create(cmd_head, PRI_DEFAULT, start_process, fn_copy);
     palloc_free_page(cmd_head);
@@ -62,6 +66,7 @@ process_execute(const char *cmd_line) {
         if(!ch->load_success){
             list_remove(&ch->elem);
             free(ch);
+            return -1;
         }
     }
 
@@ -113,7 +118,7 @@ start_process(void *cmd_line_copy_) {
 int
 process_wait(tid_t child_tid) {
     struct child *ch = find_child(child_tid);
-    if(ch->waited) return -1;
+    if(!ch || ch->waited) return -1;
     sema_down(&ch->sema);
     int exit_status = ch->terminate_by_exit? ch->status_code : -1;
     list_remove(&ch->elem);
@@ -155,6 +160,11 @@ process_exit(void) {
         pagedir_activate(NULL);
         pagedir_destroy(pd);
     }
+    if(cur->executable){
+        file_allow_write(cur->executable);
+        file_close(cur->executable);
+    }
+
 
 }
 
@@ -271,7 +281,8 @@ load(char *cmd_line, void (**eip)(void), void **esp) {
         printf("load: %s: open failed\n", file_name);
         goto done;
     }
-
+    file_deny_write (file);
+    thread_current()->executable = file;
     /* Read and verify executable header. */
     if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
         || memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -346,8 +357,6 @@ load(char *cmd_line, void (**eip)(void), void **esp) {
     success = true;
 
     done:
-    /* We arrive here whether the load is successful or not. */
-    file_close(file);
     return success;
 }
 
@@ -458,37 +467,108 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    user virtual memory. */
 static bool
 setup_stack(char *file_name, char *cmd_arg, void **esp) {
+    /*
     uint8_t *kpage;
     bool success = false;
-    int argc = 0;
+
+    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+    if (kpage != NULL)
+    {
+        success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+        if (success)
+            *esp = PHYS_BASE;
+        else
+            palloc_free_page (kpage);
+    }
+
+    char *token, *save_ptr;
+    int argc = 0,i;
+
+    char * copy = malloc(strlen(file_name)+1);
+    strlcpy (copy, file_name, strlen(file_name)+1);
+
+
+    for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
+         token = strtok_r (NULL, " ", &save_ptr))
+        argc++;
+
+
+    int *argv = calloc(argc,sizeof(int));
+
+    for (token = strtok_r (file_name, " ", &save_ptr),i=0; token != NULL;
+         token = strtok_r (NULL, " ", &save_ptr),i++)
+    {
+        *esp -= strlen(token) + 1;
+        memcpy(*esp,token,strlen(token) + 1);
+
+        argv[i]=*esp;
+    }
+
+    while((int)*esp%4!=0)
+    {
+        *esp-=sizeof(char);
+        char x = 0;
+        memcpy(*esp,&x,sizeof(char));
+    }
+
+    int zero = 0;
+
+    *esp-=sizeof(int);
+    memcpy(*esp,&zero,sizeof(int));
+
+    for(i=argc-1;i>=0;i--)
+    {
+        *esp-=sizeof(int);
+        memcpy(*esp,&argv[i],sizeof(int));
+    }
+
+    int pt = *esp;
+    *esp-=sizeof(int);
+    memcpy(*esp,&pt,sizeof(int));
+
+    *esp-=sizeof(int);
+    memcpy(*esp,&argc,sizeof(int));
+
+    *esp-=sizeof(int);
+    memcpy(*esp,&zero,sizeof(int));
+
+    free(copy);
+    free(argv);
+
+    return success;
+     */
+    uint8_t *kpage;
+    bool success = false;
+    int argc = 1;
     char *arg, *save_ptr;
-    int *arg_size = palloc_get_page(PAL_USER | PAL_ZERO);
+    int arg_size[32];
     arg_size[0] = strlen(file_name) + 1;
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
         if (success) {
-            *esp = PHYS_BASE - arg_size[argc];
-            memcpy(*esp, file_name, arg_size[argc]);
+            *esp = PHYS_BASE - arg_size[0];
+            memcpy(*esp, file_name, arg_size[0]);
             /* put argv */
             for (arg = strtok_r(cmd_arg, " ", &save_ptr); arg != NULL; arg = strtok_r(NULL, " ", &save_ptr)) {
-                ++argc;
                 arg_size[argc] = arg_size[argc - 1] + strlen(arg) + 1;
                 *esp = PHYS_BASE - arg_size[argc];
                 memcpy(*esp, arg, strlen(arg) + 1);
+                ++argc;
             }
-            ++argc;
             /* word align and argv[argc]*/
-            *esp = (unsigned)(*esp) / 4 * 4 - 4 * (argc + 4);
+            void *padding = *esp;
+            *esp = (unsigned)(*esp) / 4 * 4;
+            memset(*esp,0,padding - *esp);
+            *esp-= 4 * (argc + 4);
             memset(*esp, 0, 4);
             *(int *) (*esp + 4) = argc;
             *(char **) (*esp + 8) = *esp + 12;
             for (int i = 0; i < argc; ++i) {
-                *(char *) (*esp + 12 + i * 4) = PHYS_BASE - arg_size[i];
+                *(char **) (*esp + 12 + i * 4) = PHYS_BASE - arg_size[i];
             }
-            *(char *) (*esp + 12 + argc * 4) = 0;
+            *(char **) (*esp + 12 + argc * 4) = 0;
 
-            palloc_free_page(arg_size);
         } else
             palloc_free_page(kpage);
     }
