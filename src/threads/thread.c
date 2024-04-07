@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -59,6 +60,9 @@ static unsigned thread_ticks;   /**< # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+struct lock filesys_lock;
+
+
 static void kernel_thread(thread_func *, void *aux);
 
 static void idle(void *aux UNUSED);
@@ -88,14 +92,16 @@ static bool is_thread(struct thread *)UNUSED;
 
    It is not safe to call thread_current() until this function
    finishes. */
-        void
-        thread_init(void)
+void
+thread_init(void)
 {
     ASSERT(intr_get_level() == INTR_OFF);
 
     lock_init(&tid_lock);
     list_init(&ready_list);
     list_init(&all_list);
+
+    lock_init(&filesys_lock);
 
     /* Set up a thread structure for the running thread. */
     initial_thread = running_thread();
@@ -183,6 +189,10 @@ thread_create(const char *name, int priority,
     init_thread(t, name, priority);
     tid = t->tid = allocate_tid();
 
+    struct child *ch = (struct child *)malloc(sizeof(struct child));
+    child_init(ch, tid);
+    list_push_back(&thread_current()->children,&ch->elem);
+    t->as_child = ch;
     /* Stack frame for kernel_thread(). */
     kf = alloc_frame(t, sizeof *kf);
     kf->eip = NULL;
@@ -285,6 +295,28 @@ thread_exit(void) {
     intr_disable();
     list_remove(&thread_current()->allelem);
     thread_current()->status = THREAD_DYING;
+    thread_current()->as_child->exited = true;
+    sema_up(&thread_current()->as_child->sema);
+
+    struct list_elem *e, ne;
+    struct  list *l = &thread_current()->children;
+    for (e = list_begin (l); e != list_end (l); e = ne)
+    {
+        struct child *f = list_entry (e, struct child, elem);
+        ne = list_next (e);
+        list_remove(e);
+        if(f->exited){
+            free(f);
+        }
+        else{
+            f->parent_exited = true;
+        }
+    }
+
+    if(thread_current()->as_child->parent_exited){
+        free(thread_current()->as_child);
+    }
+
     schedule();
     NOT_REACHED();
 }
@@ -442,7 +474,9 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->stack = (uint8_t *) t + PGSIZE;
     t->priority = priority;
     t->magic = THREAD_MAGIC;
-
+    t->parent = thread_current();
+    t->file_num = 2;
+    list_init(&t->children);
     old_level = intr_disable();
     list_push_back(&all_list, &t->allelem);
     intr_set_level(old_level);
@@ -557,3 +591,45 @@ allocate_tid(void) {
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(
 struct thread, stack);
+
+void
+child_init(struct child *c, tid_t tid){
+    sema_init(&c->sema,0);
+    c->tid = tid;
+    c->exited = false;
+    c->terminate_by_exit = false;
+    c->waited = false;
+    c->parent_exited = false;
+}
+
+void
+filesys_lock_acquire()
+{
+    lock_acquire(&filesys_lock);
+}
+
+void
+filesys_lock_release()
+{
+    lock_release(&filesys_lock);
+}
+
+int fd_init(struct file_descriptor *filedescriptor, struct file *f)
+{
+    filedescriptor->file_ptr = f;
+    filedescriptor->fd = thread_current()->file_num;
+    ++thread_current()->file_num;
+    list_push_back(&thread_current()->fd_set, &filedescriptor->elem);
+    return filedescriptor->fd;
+}
+
+struct file_descriptor *fd_find(int fd)
+{
+    struct thread *cur = thread_current();
+    struct list_elem *e;
+    for (e = list_begin(&cur->fd_set); e != list_end(&cur->fd_set); e = list_next(e)) {
+        struct file_descriptor *file = list_entry(e, struct file_descriptor, elem);
+        if(file->fd == fd) return file;
+    }
+    return NULL;
+}

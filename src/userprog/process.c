@@ -17,40 +17,62 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process
 NO_RETURN;
 
-static bool load(const char *cmdline, void (**eip)(void), void **esp);
+static bool load(char *cmd_line, void (**eip)(void), void **esp);
+
+static struct child *find_child(tid_t child_tid);
 
 /** Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute(const char *file_name) {
+process_execute(const char *cmd_line) {
     char *fn_copy;
+    char *cmd_head;
+    char *save_ptr;
     tid_t tid;
 
-    /* Make a copy of FILE_NAME.
+    /* Make a copy of cmd_line.
        Otherwise there's a race between the caller and load(). */
     fn_copy = palloc_get_page(0);
     if (fn_copy == NULL)
         return TID_ERROR;
-    strlcpy(fn_copy, file_name, PGSIZE);
+    strlcpy(fn_copy, cmd_line, PGSIZE);
 
-    /* Create a new thread to execute FILE_NAME. */
-    tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
-    if (tid == TID_ERROR)
+    cmd_head = palloc_get_page(0);
+    if (cmd_head == NULL)
+        return TID_ERROR;
+    strlcpy(cmd_head, cmd_line, PGSIZE);
+    cmd_head = strtok_r(cmd_head, " ", &save_ptr);
+    /* Create a new thread to execute cmd_line. */
+    tid = thread_create(cmd_head, PRI_DEFAULT, start_process, fn_copy);
+    palloc_free_page(cmd_head);
+    if (tid == TID_ERROR) {
         palloc_free_page(fn_copy);
+    }
+    else{
+        struct child *ch = list_entry(list_back(&thread_current()->children), struct child, elem);
+        /* check if load success */
+        sema_down(&ch->sema);
+        if(!ch->load_success){
+            list_remove(ch->elem);
+            free(ch);
+        }
+    }
+
     return tid;
 }
 
 /** A thread function that loads a user process and starts it
    running. */
 static void
-start_process(void *file_name_) {
-    char *file_name = file_name_;
+start_process(void *cmd_line_copy_) {
+    char *cmd_line_copy = cmd_line_copy_;
     struct intr_frame if_;
     bool success;
 
@@ -59,12 +81,15 @@ start_process(void *file_name_) {
     if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
     if_.cs = SEL_UCSEG;
     if_.eflags = FLAG_IF | FLAG_MBS;
-    success = load(file_name, &if_.eip, &if_.esp);
+    success = load(cmd_line_copy, &if_.eip, &if_.esp);
 
     /* If load failed, quit. */
-    palloc_free_page(file_name);
+    palloc_free_page(cmd_line_copy);
+    thread_current()->as_child->load_success = success;
+    sema_up(&thread_current()->as_child->sema);
     if (!success)
         thread_exit();
+
 
     /* Start the user process by simulating a return from an
        interrupt, implemented by intr_exit (in
@@ -86,8 +111,27 @@ start_process(void *file_name_) {
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait(tid_t child_tid UNUSED) {
-    return -1;
+process_wait(tid_t child_tid) {
+    struct child *ch = find_child(child_tid);
+    if(ch.waited) return -1;
+    sema_down(&ch->sema);
+    int exit_status = ch->terminate_by_exit? ch->status_code : -1;
+    list_remove(&ch->elem);
+    free(ch);
+}
+
+/** not find return NULL */
+static struct child *
+find_child(tid_t child_tid) {
+    if(child_tid)
+    struct list_elem *e;
+    struct  list *l = &thread_current()->children;
+    for (e = list_begin (l); e != list_end (l); e = list_next (e))
+    {
+        struct child *f = list_entry (e, struct child, elem);
+        if(f->tid == child_tid) return f;
+    }
+    return NULL;
 }
 
 /** Free the current process's resources. */
@@ -190,7 +234,7 @@ struct Elf32_Phdr {
 #define PF_W 2          /**< Writable. */
 #define PF_R 4          /**< Readable. */
 
-static bool setup_stack(void **esp);
+static bool setup_stack(char *file_name, char *cmd_arg, void **esp);
 
 static bool validate_segment(const struct Elf32_Phdr *, struct file *);
 
@@ -203,13 +247,17 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load(const char *file_name, void (**eip)(void), void **esp) {
+load(char *cmd_line, void (**eip)(void), void **esp) {
     struct thread *t = thread_current();
     struct Elf32_Ehdr ehdr;
     struct file *file = NULL;
     off_t file_ofs;
     bool success = false;
     int i;
+
+    char *file_name;
+    char *cmd_arg;
+    file_name = strtok_r(cmd_line, " ", &cmd_arg);
 
     /* Allocate and activate page directory. */
     t->pagedir = pagedir_create();
@@ -289,7 +337,7 @@ load(const char *file_name, void (**eip)(void), void **esp) {
     }
 
     /* Set up stack. */
-    if (!setup_stack(esp))
+    if (!setup_stack(file_name, cmd_arg, esp))
         goto done;
 
     /* Start address. */
@@ -409,16 +457,39 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 /** Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack(void **esp) {
+setup_stack(char *file_name, char *cmd_arg, void **esp) {
     uint8_t *kpage;
     bool success = false;
-
+    int argc = 0;
+    char *arg, *save_ptr;
+    int *arg_size = palloc_get_page(PAL_USER | PAL_ZERO);
+    arg_size[0] = strlen(file_name) + 1;
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-        if (success)
-            *esp = PHYS_BASE;
-        else
+        if (success) {
+            *esp = PHYS_BASE - arg_size[argc];
+            memcpy(*esp, file_name, arg_size[argc]);
+            /* put argv */
+            for (arg = strtok_r(cmd_arg, " ", &save_ptr); arg != NULL; arg = strtok_r(NULL, " ", &save_ptr)) {
+                ++argc;
+                arg_size[argc] = arg_size[argc - 1] + strlen(arg) + 1;
+                *esp = PHYS_BASE - arg_size[argc]
+                memcpy(*esp, arg, strlen(arg) + 1);
+            }
+            ++argc;
+            /* word align and argv[argc]*/
+            *esp = *esp / 4 * 4 - 4 * (argc + 4);
+            memset(*esp, 0, 4);
+            (int *) (*esp + 4) = argc;
+            (char **) (*esp + 8) = *esp + 12;
+            for (int i = 0; i < argc; ++i) {
+                (char *) (*esp + 12 + i * 4) = PHYS_BASE - arg_size[i];
+            }
+            (char *) (*esp + 12 + argc * 4) = 0;
+
+            palloc_free_page(arg_size);
+        } else
             palloc_free_page(kpage);
     }
     return success;

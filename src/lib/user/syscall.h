@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 #include <debug.h>
+#include "devices/shutdown.h"
+#include "threads/interrupt.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
 
 /** Process identifier. */
 typedef int pid_t;
@@ -18,6 +22,8 @@ typedef int mapid_t;
 /** Typical return values from main() and arguments to exit(). */
 #define EXIT_SUCCESS 0          /**< Successful execution. */
 #define EXIT_FAILURE 1          /**< Unsuccessful execution. */
+
+#define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 /** Projects 2 and later. */
 void halt(void)

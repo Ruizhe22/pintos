@@ -4,7 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "threads/synch.h"
+#include "filesys/filesys.h"
 /** States in a thread's life cycle. */
 enum thread_status {
     THREAD_RUNNING,     /**< Running thread. */
@@ -94,16 +95,44 @@ struct thread {
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /**< Page directory. */
-#endif
 
+#endif
+    struct thread *parent;
+    struct list children;
+    struct child *as_child;
+    int file_num;
+    struct list fd_set;
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
+};
+
+/* on heap */
+struct child{
+    tid_t tid;
+    int status_code;
+    bool load_success;
+    bool exited;
+    bool terminate_by_exit;
+    bool waited;
+    bool parent_exited;
+    struct semaphore sema;
+    struct list_elem elem;
+};
+
+/* file descriptor */
+struct file_descriptor{
+    int fd;
+    struct file* file_ptr;
+    struct list_elem elem;
 };
 
 /** If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+
+void filesys_lock_acquire();
+void filesys_lock_release();
 
 void thread_init(void);
 
@@ -149,5 +178,11 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 
 int thread_get_load_avg(void);
+
+void child_init(struct child *, tid_t);
+
+int fd_init(struct file_descriptor *, struct file *);
+
+struct file_descriptor *fd_find(int );
 
 #endif /**< threads/thread.h */
