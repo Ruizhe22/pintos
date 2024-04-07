@@ -8,8 +8,7 @@
 const char *test_name = "child-simple";
 
 int
-main (void) 
-{
-  msg ("run");
-  return 81;
+main(void) {
+    msg("run");
+    return 81;
 }
