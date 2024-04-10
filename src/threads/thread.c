@@ -297,6 +297,7 @@ thread_exit(void) {
     struct thread *cur = thread_current();
     struct list_elem *e, *ne;
     struct  list *l;
+    /* close the unclosed file, free the struct file_descriptor of the unclosed file */
     l = &cur->fd_set;
     for (e = list_begin (l); e != list_end (l); e = ne)
     {
@@ -309,10 +310,13 @@ thread_exit(void) {
 
     list_remove(&cur->allelem);
     cur->status = THREAD_DYING;
+
+    /* set the status of the struct child of its own, and sema_up the semaphore
+     * because it maybe used by its parent after it exits */
     cur->as_child->exited = true;
     sema_up(&cur->as_child->sema);
 
-
+    /* cleanup child threads' child structs */
     l = &cur->children;
     for (e = list_begin (l); e != list_end (l); e = ne)
     {
@@ -327,7 +331,7 @@ thread_exit(void) {
         }
     }
 
-
+    /* free the child struct of its own if the parent has exited */
     if(cur->as_child->parent_exited){
         free(cur->as_child);
     }
@@ -608,6 +612,8 @@ allocate_tid(void) {
 uint32_t thread_stack_ofs = offsetof(
 struct thread, stack);
 
+/** used to initialize a child struct with the given thread ID.
+ It initializes the semaphore to 0, which is used for wait, sets the thread ID, and initializes various flags in the child struct. */
 void
 child_init(struct child *c, tid_t tid){
     sema_init(&c->sema,0);
@@ -617,6 +623,8 @@ child_init(struct child *c, tid_t tid){
     c->waited = false;
     c->parent_exited = false;
 }
+
+/** These two functions are used for acquiring and releasing the file system lock. */
 
 void
 filesys_lock_acquire()
@@ -630,6 +638,12 @@ filesys_lock_release()
     lock_release(&filesys_lock);
 }
 
+/** used for initializing a file descriptor with the given file pointer in Open syscall.
+ * It sets the file pointer, assigns a file descriptor ID to the file descriptor,
+ * increments the file descriptor count for the current thread,
+ * adds the file descriptor to the thread's file descriptor set,
+ * and returns the assigned file descriptor ID.
+ */
 int fd_init(struct file_descriptor *filedescriptor, struct file *f)
 {
     filedescriptor->file_ptr = f;
@@ -639,6 +653,10 @@ int fd_init(struct file_descriptor *filedescriptor, struct file *f)
     return filedescriptor->fd;
 }
 
+/** used to find a file descriptor with the given file descriptor ID.
+ * It iterates through the file descriptor set of the current thread and returns the file descriptor
+ * with the matching file descriptor ID. If no such file descriptor is found, it returns NULL.
+ */
 struct file_descriptor *fd_find(int fd)
 {
     struct thread *cur = thread_current();

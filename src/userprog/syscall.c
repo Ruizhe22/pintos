@@ -20,6 +20,8 @@ void
 syscall_init(void) {
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
+
+/** xv6 style, syscalls */
 static void sys_halt(struct intr_frame *);
 static void sys_exit(struct intr_frame *);
 static void sys_exec(struct intr_frame *);
@@ -51,6 +53,7 @@ static void (*syscalls[])(struct intr_frame *) = {
 };
 
 
+/** read syscall number, and invoke the corresponding syscall function installed in 'syscalls' vector  */
 static void
 syscall_handler(struct intr_frame *f) {
     int num;
@@ -68,6 +71,7 @@ syscall_handler(struct intr_frame *f) {
     }
 }
 
+/** use the first method to check if address provided by the user is safe and legal */
 static bool
 check_pointer(const void *vaddr)
 {
@@ -84,7 +88,17 @@ check_pointer(const void *vaddr)
 }
 
 
-/** Projects 2 and later. */
+/** Projects 2 and later.
+ *
+ * every syscall handler is divided into two function,
+ * the one starting with "sys" is called directly by syscall handler, retrieving the parameters from the intr_frame.
+ * the other one starting without "sys" is called by corresponding "sys" function with the args already retieved.
+ * "sys" functions' prototype are all void(struct intr_frame *), so they can be installed into the "syscalls" vector,
+ * they checks the validity of the arguments above esp pointer, if the arguments are not valid, calls exit(-1).
+ * acquires the file system lock(if needed), calls corresponding function with the argument value,
+ * sets the return value in f->eax(if needed), and releases the file system lock(if needed).
+ * "no sys" functions implement the substantial work, some of which are made inline functions to accelerate.
+ * */
 
 inline void
 halt(void)
@@ -92,11 +106,13 @@ halt(void)
     shutdown_power_off();
 }
 
-static void sys_halt(struct intr_frame *f)
+static void
+sys_halt(struct intr_frame *f)
 {
     halt();
 }
 
+/* updates the status code and terminates the current thread. **/
 void
 exit(int status)
 {
@@ -119,6 +135,7 @@ sys_exit(struct intr_frame *f)
     }
 }
 
+/** calls process_execute(file) to create a new process. return the tid of new thread. */
 inline tid_t
 exec(const char *file)
 {
@@ -139,6 +156,8 @@ static void sys_exec(struct intr_frame *f)
     }
 }
 
+/** calls process_wait(pid) to wait for the child process to exit, return the status code if child exits by syscall. */
+
 inline int
 wait(tid_t pid)
 {
@@ -155,6 +174,8 @@ static void sys_wait(struct intr_frame *f)
         exit(-1);
     }
 }
+
+/** creat a new file with the specified name and initial size. */
 
 inline bool
 create(const char *file, unsigned initial_size)
@@ -177,6 +198,8 @@ sys_create(struct intr_frame *f)
     }
 }
 
+/** remove a file with the specified name. */
+
 inline bool
 remove(const char *file)
 {
@@ -196,6 +219,9 @@ sys_remove(struct intr_frame *f)
         exit(-1);
     }
 }
+
+/** open the file using filesys_open(file) and initializes a file descriptor by calling fd_init function where the fd
+ * number will be allocated automatically, and the file_descriptor struct will be kept into the thread's struct. */
 
 int
 open(const char *file)
@@ -219,6 +245,9 @@ static void sys_open(struct intr_frame *f)
     }
 }
 
+/** finds the file descriptor associated with the given file descriptor ID,
+ * and then returns the length of the file using file_length. */
+
 inline int
 filesize(int fd)
 {
@@ -240,6 +269,10 @@ static void sys_filesize(struct intr_frame *f)
     }
 
 }
+
+/** reads data from a file descriptor or standard input.
+ * If fd is 0, it reads from standard input using input_getc().
+ * If fd is not 0, it finds the file descriptor associated with the given file descriptor ID and reads from the file.*/
 
 int
 read(int fd, void *buffer, unsigned length)
@@ -274,6 +307,10 @@ sys_read(struct intr_frame *f)
     }
 }
 
+/** write data to a file descriptor or standard output.
+ * If fd is 1, it writes to standard output using putbuf(buffer, length).
+ * If fd is not 1, it finds the file descriptor associated with the given file descriptor ID and writes to the file. */
+
 int
 write(int fd, const void *buffer, unsigned length)
 {
@@ -305,6 +342,8 @@ sys_write(struct intr_frame *f)
     }
 }
 
+/** find the file descriptor by fd number and calls file_seek to update the position. */
+
 void
 seek(int fd, unsigned position)
 {
@@ -328,6 +367,8 @@ sys_seek(struct intr_frame *f)
     }
 }
 
+/**  find the file descriptor by fd number and calls file_tell to get the current position. */
+
 unsigned
 tell(int fd)
 {
@@ -349,6 +390,10 @@ sys_tell(struct intr_frame *f)
         exit(-1);
     }
 }
+
+/** closes the file descriptor associated with the given file descriptor ID,
+ * removes the file descriptor from the list, and frees the struct's memory.
+ */
 
 void
 close(int fd)

@@ -106,20 +106,28 @@ struct thread {
     unsigned magic;                     /**< Detects stack overflow. */
 };
 
-/* on heap */
+/** on heap
+ * this struct is both pointed by child thread (attribute "as_child") and parent thread(in attribute list "children").
+ * It will be free by one of the two threads which exits later.
+ * It is created in function thread_create(), in the meanwhile, inserted into the parent's list "children".
+ * It may be freed in function process_execute() if new thread load fail, or in thread_exit() by child itself
+ * if parent has exit, or by parent if the child has exited.
+ * */
 struct child{
     tid_t tid;
-    int status_code;
-    bool load_success;
+    int status_code;                 /**< Exit status code only use if terminate_by_exit is true. */
+    bool load_success;               /**< record if load success, checked by parent thread. */
     bool exited;
-    bool terminate_by_exit;
-    bool waited;
-    bool parent_exited;
-    struct semaphore sema;
+    bool terminate_by_exit;          /**< Exits with exit syscall, thus has a status code. */
+    bool waited;                     /**< Already waited by parent, in case of wait twice. */
+    bool parent_exited;             /**< Checked in thread_exit(). if true, the child struct will be freed by child. */
+    struct semaphore sema;           /*< Used to wait for load result and in the wait syscall */
     struct list_elem elem;
 };
 
-/* file descriptor */
+/** file descriptor, held by thread in a list
+ * the fd number is depending on the thread's attrubute file_num,
+ * and allocated automatically in the init_fd() funtion. */
 struct file_descriptor{
     int fd;
     struct file* file_ptr;

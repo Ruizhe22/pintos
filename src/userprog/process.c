@@ -53,13 +53,16 @@ process_execute(const char *cmd_line) {
     struct file *file;
     if(!(file = filesys_open(cmd_head))) return -1;
     file_close(file);
-    /* Create a new thread to execute cmd_line. */
+    /* Create a new thread to execute cmd_line.
+     when return from thread_create, struct child of this new thread is already initialized and inserted in lists. */
     tid = thread_create(cmd_head, PRI_DEFAULT, start_process, fn_copy);
     palloc_free_page(cmd_head);
     if (tid == TID_ERROR) {
         palloc_free_page(fn_copy);
     }
     else{
+        /* the last struct child in list children of the current thread must belong to the new created child thread
+         and if child does not succeed in loading, remove it from list and free the struct child. */
         struct child *ch = list_entry(list_back(&thread_current()->children), struct child, elem);
         /* check if load success */
         sema_down(&ch->sema);
@@ -118,15 +121,18 @@ start_process(void *cmd_line_copy_) {
 int
 process_wait(tid_t child_tid) {
     struct child *ch = find_child(child_tid);
+    /* */
     if(!ch || ch->waited) return -1;
+    /* use semaphore to sleep the parent to wait for the child. */
     sema_down(&ch->sema);
     int exit_status = ch->terminate_by_exit? ch->status_code : -1;
+    /* free the resource used by the child */
     list_remove(&ch->elem);
     free(ch);
     return exit_status;
 }
 
-/** not find return NULL */
+/** search in the thread's attribute of list "children" using tid, if not find return NULL */
 static struct child *
 find_child(tid_t child_tid) {
     struct list_elem *e;
@@ -160,6 +166,8 @@ process_exit(void) {
         pagedir_activate(NULL);
         pagedir_destroy(pd);
     }
+
+    /* if the cur thread is a user thread having a executable, close this file at this moment. */
     if(cur->executable){
         file_allow_write(cur->executable);
         file_close(cur->executable);
@@ -467,76 +475,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    user virtual memory. */
 static bool
 setup_stack(char *file_name, char *cmd_arg, void **esp) {
-    /*
-    uint8_t *kpage;
-    bool success = false;
-
-    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-    if (kpage != NULL)
-    {
-        success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-        if (success)
-            *esp = PHYS_BASE;
-        else
-            palloc_free_page (kpage);
-    }
-
-    char *token, *save_ptr;
-    int argc = 0,i;
-
-    char * copy = malloc(strlen(file_name)+1);
-    strlcpy (copy, file_name, strlen(file_name)+1);
-
-
-    for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
-         token = strtok_r (NULL, " ", &save_ptr))
-        argc++;
-
-
-    int *argv = calloc(argc,sizeof(int));
-
-    for (token = strtok_r (file_name, " ", &save_ptr),i=0; token != NULL;
-         token = strtok_r (NULL, " ", &save_ptr),i++)
-    {
-        *esp -= strlen(token) + 1;
-        memcpy(*esp,token,strlen(token) + 1);
-
-        argv[i]=*esp;
-    }
-
-    while((int)*esp%4!=0)
-    {
-        *esp-=sizeof(char);
-        char x = 0;
-        memcpy(*esp,&x,sizeof(char));
-    }
-
-    int zero = 0;
-
-    *esp-=sizeof(int);
-    memcpy(*esp,&zero,sizeof(int));
-
-    for(i=argc-1;i>=0;i--)
-    {
-        *esp-=sizeof(int);
-        memcpy(*esp,&argv[i],sizeof(int));
-    }
-
-    int pt = *esp;
-    *esp-=sizeof(int);
-    memcpy(*esp,&pt,sizeof(int));
-
-    *esp-=sizeof(int);
-    memcpy(*esp,&argc,sizeof(int));
-
-    *esp-=sizeof(int);
-    memcpy(*esp,&zero,sizeof(int));
-
-    free(copy);
-    free(argv);
-
-    return success;
-     */
     uint8_t *kpage;
     bool success = false;
     int argc = 1;
@@ -549,17 +487,18 @@ setup_stack(char *file_name, char *cmd_arg, void **esp) {
         if (success) {
             *esp = PHYS_BASE - arg_size[0];
             memcpy(*esp, file_name, arg_size[0]);
-            /* put argv */
+            /* put arg strings on the user stack to start executing a new code file */
             for (arg = strtok_r(cmd_arg, " ", &save_ptr); arg != NULL; arg = strtok_r(NULL, " ", &save_ptr)) {
                 arg_size[argc] = arg_size[argc - 1] + strlen(arg) + 1;
                 *esp = PHYS_BASE - arg_size[argc];
                 memcpy(*esp, arg, strlen(arg) + 1);
                 ++argc;
             }
-            /* word align and argv[argc]*/
+            /* word align */
             void *padding = *esp;
             *esp = (unsigned)(*esp) / 4 * 4;
             memset(*esp,0,padding - *esp);
+            /* put args ptr in proper order and argc */
             *esp-= 4 * (argc + 4);
             memset(*esp, 0, 4);
             *(int *) (*esp + 4) = argc;
