@@ -252,7 +252,10 @@ inline int
 filesize(int fd)
 {
     struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) exit(-1);
+    if(!fileDescriptor) {
+        filesys_lock_release();
+        exit(-1);
+    }
     return file_length(fileDescriptor->file_ptr);
 }
 
@@ -285,7 +288,10 @@ read(int fd, void *buffer, unsigned length)
     }
     else{
         struct file_descriptor *fileDescriptor = fd_find(fd);
-        if(!fileDescriptor) exit(-1);
+        if(!fileDescriptor) {
+            filesys_lock_release();
+            exit(-1);
+        }
         return file_read(fileDescriptor->file_ptr, buffer, length);
     }
 }
@@ -320,7 +326,10 @@ write(int fd, const void *buffer, unsigned length)
     }
     else{
         struct file_descriptor *fileDescriptor = fd_find(fd);
-        if(!fileDescriptor) exit(-1);
+        if(!fileDescriptor) {
+            filesys_lock_release();
+            exit(-1);
+        }
         return file_write(fileDescriptor->file_ptr, buffer, length);
     }
 }
@@ -348,7 +357,10 @@ void
 seek(int fd, unsigned position)
 {
     struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) exit(-1);;
+    if(!fileDescriptor) {
+        filesys_lock_release();
+        exit(-1);
+    }
     file_seek(fileDescriptor->file_ptr, position);
 }
 
@@ -373,7 +385,10 @@ unsigned
 tell(int fd)
 {
     struct file_descriptor *fileDescriptor = fd_find(fd);
-    if(!fileDescriptor) exit(-1);;
+    if(!fileDescriptor) {
+        filesys_lock_release();
+        exit(-1);
+    }
     return file_tell(fileDescriptor->file_ptr);
 }
 
