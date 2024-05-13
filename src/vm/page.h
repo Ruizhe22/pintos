@@ -55,7 +55,7 @@ struct page {
 };
 
 /* evoked when load, create a struct page_file in heap */
-struct page *create_page(struct file *file, uint32_t read_bytes, uint32_t zero_bytes, bool writable);
+struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage);
 
 /* insert into hash table */
 bool insert_page(struct hash *page_table, struct page *page);
@@ -77,7 +77,7 @@ bool page_less_func (const struct hash_elem *a,const struct hash_elem *b, void *
 bool page_table_init(struct hash *hash, hash_hash_func *hash_func, hash_less_func *less_func);
 
 /* evoked in thread_exit */
-bool page_table_destroy(struct hash *hash, hash_action_func *action);
+void page_table_destroy(struct hash *hash, hash_action_func *action);
 
 
 #endif //PINTOS_PAGE_H

@@ -40,13 +40,13 @@ void swap_init();
  * write the frame into the sector
  * set page->swap_slot
  * */
-void write_swap(struct page *page, struct frame *frame);
+void write_swap(struct page *page);
 
 /* swap slot is in page->swap_slot
  * read into the frame
  * clear the swap slot
  * */
-void read_swap(struct page *page, struct frame *frame);
+void read_swap(struct page *page);
 
 
 

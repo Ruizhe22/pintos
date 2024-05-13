@@ -4,29 +4,11 @@
 
 #include "swap.h"
 #include <debug.h>
-#include <inttypes.h>
-#include <round.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <hash.h>
 #include <bitmap.h>
 #include "devices/block.h"
 #include "threads/synch.h"
-#include "userprog/gdt.h"
-#include "userprog/pagedir.h"
 #include "userprog/tss.h"
-#include "filesys/directory.h"
-#include "filesys/file.h"
-#include "filesys/filesys.h"
-#include "threads/flags.h"
-#include "threads/init.h"
-#include "threads/interrupt.h"
-#include "threads/palloc.h"
-#include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
-#include "userprog/syscall.h"
 #include "page.h"
 #include "frame.h"
 
@@ -42,7 +24,7 @@ void swap_init(void)
     lock_init(&swap_lock);
 }
 
-void read_swap(struct page *page, struct frame *frame)
+void read_swap(struct page *page)
 {
     lock_acquire(&swap_lock);
     bitmap_flip(swap_table, page->swap_slot);
@@ -56,7 +38,7 @@ void read_swap(struct page *page, struct frame *frame)
  * write the frame into the sector
  * set page->swap_slot
  * */
-void write_swap(struct page *page, struct frame *frame)
+void write_swap(struct page *page)
 {
     lock_acquire(&swap_lock);
     size_t free_slot = bitmap_scan_and_flip(swap_table, 0, 1, 0);

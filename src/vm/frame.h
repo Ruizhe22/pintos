@@ -30,10 +30,6 @@
 #include "swap.h"
 
 
-/* global data structure */
-extern struct lock frame_table_lock;
-extern struct list frame_table;
-
 struct frame {
     struct page *page;
     bool pin;       /* can't be evicted, indicate page is being loaded or accessed by kernel */

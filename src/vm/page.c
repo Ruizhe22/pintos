@@ -93,7 +93,7 @@ bool insert_page(struct hash *page_table, struct page *page)
 struct page *find_page(struct hash *page_table, void *user_addr)
 {
     struct page page_tmp;
-    page_tmp.upage = ROUND_DOWN(user_addr, PGSIZE);
+    page_tmp.upage = (void *)ROUND_DOWN((uint32_t )user_addr, PGSIZE);
     struct hash_elem *e = hash_find(page_table, &page_tmp.hash_elem);
     if (!e) return NULL;
     else return hash_entry(e, struct page, hash_elem);
@@ -148,6 +148,7 @@ bool load_page(struct page *page)
  * need to acquire the lock, and set pin to true
  * not set page->status until load finish.
  * */
+extern struct list frame_table;
 void link_page_frame(struct page *page,struct frame *frame)
 {
     page->frame = frame;
@@ -174,6 +175,7 @@ bool load_page_from_file(struct page *page, struct frame *frame)
 
 bool load_page_from_swap(struct page *page, struct frame *frame)
 {
+    read_swap(page);
     return true;
 }
 

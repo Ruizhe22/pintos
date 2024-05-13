@@ -27,6 +27,7 @@
 #include "page.h"
 #include "swap.h"
 
+
 /* initial in thread.c */
 struct lock frame_table_lock;
 struct list frame_table;
@@ -86,10 +87,11 @@ bool save_frame(struct frame *frame)
 {
     frame_table_lock_acquire();
     /* the order of statements bellow can't be change! */
-    if(frame->page->writable && pagedir_is_dirty(frame->thread->pagedir, frame->page->upage)){
+    if(frame->page->writable){
         frame->page->status = PAGE_SWAP;
         pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
-        return write_swap(frame->page, frame);
+        write_swap(frame->page);
+        return true;
     }
     else {
         frame->page->status = PAGE_FILE;
@@ -106,9 +108,9 @@ bool save_frame(struct frame *frame)
 void evict_frame(struct frame *frame)
 {
     frame_table_lock_acquire();
-    list_remove(frame->elem);
+    list_remove(&frame->elem);
     frame_table_lock_release();
-    frame->page->frame = NULL
+    frame->page->frame = NULL;
     palloc_free_page(frame->kpage);
     free(frame);
 }
