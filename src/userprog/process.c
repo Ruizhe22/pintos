@@ -433,6 +433,8 @@ validate_segment(const struct Elf32_Phdr *phdr, struct file *file) {
 static bool
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
              uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+
+#ifndef VM
     ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
     ASSERT(pg_ofs(upage) == 0);
     ASSERT(ofs % PGSIZE == 0);
@@ -469,6 +471,10 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
         upage += PGSIZE;
     }
     return true;
+#else
+
+#endif
+
 }
 
 /** Create a minimal stack by mapping a zeroed page at the top of
@@ -523,7 +529,7 @@ setup_stack(char *file_name, char *cmd_arg, void **esp) {
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page(void *upage, void *kpage, bool writable) {
     struct thread *t = thread_current();
 

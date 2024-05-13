@@ -102,6 +102,9 @@ struct thread {
     int file_num;
     struct list fd_set;
     struct file *executable;
+
+    struct hash page_table;
+
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
 };
