@@ -32,7 +32,7 @@
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED)
 {
     const struct page *p = hash_entry (e, struct page, hash_elem);
-    return hash_bytes (&p->upage, sizeof p->upage);
+    return hash_int((int)p->upage);
 }
 
 bool page_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED)
@@ -44,9 +44,9 @@ bool page_less_func (const struct hash_elem *a, const struct hash_elem *b, void 
 
 
 /* evoked in thread_create */
-bool page_table_init(struct hash *hash, hash_hash_func *hash_func, hash_less_func *less_func)
+bool page_table_init(struct hash *hash)
 {
-    return hash_init (hash, hash_func, less_func, NULL);
+    return hash_init (hash, page_hash_func, page_less_func, NULL);
 }
 
 static void page_destroy_action_func(struct hash_elem *e, void *aux UNUSED)
@@ -60,7 +60,7 @@ static void page_destroy_action_func(struct hash_elem *e, void *aux UNUSED)
 }
 
 /* evoked in thread_exit */
-void page_table_destroy(struct hash *hash, hash_action_func *action)
+void page_table_destroy(struct hash *hash)
 {
     hash_destroy(hash, page_destroy_action_func);
 }
@@ -89,11 +89,26 @@ bool insert_page(struct hash *page_table, struct page *page)
     return (hash_insert(page_table, &page->hash_elem) == NULL);
 }
 
+struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage)
+{
+    struct page *page = (struct page *)malloc(sizeof(struct page));
+    page->file.file = file;
+    page->file.file_offset = ofs;
+    page->file.read_bytes = read_bytes;
+    page->file.zero_bytes = zero_bytes;
+    page->writable = writable;
+    page->upage = upage;
+    page->status = PAGE_FILE;
+    page->frame = NULL;
+    page->thread = thread;
+    hash_insert(&thread->page_table, &page->hash_elem);
+    return page;
+}
 
 struct page *find_page(struct hash *page_table, void *user_addr)
 {
     struct page page_tmp;
-    page_tmp.upage = (void *)ROUND_DOWN((uint32_t )user_addr, PGSIZE);
+    page_tmp.upage = (void *) ((uintptr_t) user_addr & ~PGMASK);
     struct hash_elem *e = hash_find(page_table, &page_tmp.hash_elem);
     if (!e) return NULL;
     else return hash_entry(e, struct page, hash_elem);
@@ -112,16 +127,16 @@ bool load_page(struct page *page)
     }
     else {
 
-        struct frame *frame = alloc_frame();
+        struct frame *frame = allot_frame();
         link_page_frame(page, frame);
 
         if (page->status == PAGE_SWAP) {
-            if(!load_page_from_swap(page,frame->kpage)) {
+            if(!load_page_from_swap(page,frame)) {
                 frame_table_lock_release();
                 return false;
             }
         } else if (page->status == PAGE_FILE) {
-            if(!load_page_from_file(page, frame->kpage)) {
+            if(!load_page_from_file(page, frame)) {
                 frame_table_lock_release();
                 return false;
             }
@@ -162,6 +177,7 @@ void link_page_frame(struct page *page,struct frame *frame)
 /* fill in the frame */
 bool load_page_from_file(struct page *page, struct frame *frame)
 {
+    //printf("frame %p\n", frame->kpage);
     struct page_file *pfile = &page->file;
     file_seek(pfile->file, pfile->file_offset);
     void *kpage = frame->kpage;

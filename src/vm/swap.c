@@ -16,7 +16,7 @@ struct lock swap_lock;
 struct block *swap_block_device;
 struct bitmap *swap_table;
 
-void swap_init(void)
+void swap_init()
 {
     swap_block_device = block_get_role(BLOCK_SWAP);
     swap_table = bitmap_create( block_size(swap_block_device) / SECTORS_PER_PAGE );

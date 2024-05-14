@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "devices/shutdown.h"
+#include "userprog/exception.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -10,6 +11,9 @@
 #include "filesys/file.h"
 #include "devices/input.h"
 #include "lib/kernel/stdio.h"
+#include "vm/swap.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 static void syscall_handler(struct intr_frame *);
 
@@ -75,9 +79,14 @@ syscall_handler(struct intr_frame *f) {
 static bool
 check_pointer(const void *vaddr)
 {
-    if (!is_user_vaddr(vaddr))
+    if (!is_user_vaddr(vaddr) || vaddr < USER_VADDR_BOTTOM)
     {
         return false;
+    }
+    struct page *page = find_page(&thread_current()->page_table, vaddr);
+    if (page)
+    {
+        load_page(page);
     }
     void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
     if (!ptr)
@@ -85,6 +94,7 @@ check_pointer(const void *vaddr)
         return false;
     }
     return true;
+
 }
 
 

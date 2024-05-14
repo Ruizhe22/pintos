@@ -14,6 +14,9 @@
 #include "threads/malloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "vm/swap.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -498,6 +501,7 @@ init_thread(struct thread *t, const char *name, int priority) {
     list_init(&t->fd_set);
     t->executable = NULL;
     old_level = intr_disable();
+    //page_table_init(&t->page_table);
     list_push_back(&all_list, &t->allelem);
     intr_set_level(old_level);
 }

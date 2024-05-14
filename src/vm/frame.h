@@ -45,7 +45,7 @@ void frame_table_init();
  * need to acquire new space from user pool or evict another frame.
  * construct the frame entry, only set the kpage field, !!not insert it into the frame_table.
  * */
-struct frame *alloc_frame();
+struct frame *allot_frame();
 struct frame *select_frame_to_evict();
 /* save frame content before evict it */
 bool save_frame(struct frame *frame);

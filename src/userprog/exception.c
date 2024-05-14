@@ -5,6 +5,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/syscall.h"
+#include "vm/swap.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 /** Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -144,17 +147,23 @@ page_fault(struct intr_frame *f) {
     write = (f->error_code & PF_W) != 0;
     user = (f->error_code & PF_U) != 0;
 
-    /* if page fault occurs, exit with -1 */
-    exit(-1);
+    //printf("page table %d\n",(int)hash_size(&thread_current()->page_table));
+    //printf("fault_addr %d\n",(int)fault_addr);
+    //printf("fault_addr no off %d\n",(int)((uintptr_t) fault_addr & ~PGMASK));
+    /* Allow the pager to try to handle it. */
 
-    /* To implement virtual memory, delete the rest of the function
-       body, and replace it with code that brings in the page to
-       which fault_addr refers. */
-    printf("Page fault at %p: %s error %s page in %s context.\n",
-           fault_addr,
-           not_present ? "not present" : "rights violation",
-           write ? "writing" : "reading",
-           user ? "user" : "kernel");
-    kill(f);
+    if (fault_addr == NULL || !not_present || !is_user_vaddr(fault_addr))
+        exit (-1);
+
+    struct page *page = find_page(&thread_current()->page_table, fault_addr);
+    if (page != NULL && !page->status==PAGE_FRAME) {
+        load_page(page);
+        //exit(-4);
+    }
+    else{
+        if (!pagedir_get_page (thread_current()->pagedir, fault_addr))
+            exit (-1);
+    }
+
 }
 

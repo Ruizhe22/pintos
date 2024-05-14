@@ -56,9 +56,11 @@ struct page {
 
 /* evoked when load, create a struct page_file in heap */
 struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage);
-
 /* insert into hash table */
 bool insert_page(struct hash *page_table, struct page *page);
+struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage);
+
+
 struct page *find_page(struct hash *page_table, void *user_addr);
 
 /* evoked when page fault or kernel memory access, need to find a frame,
@@ -74,10 +76,10 @@ unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool page_less_func (const struct hash_elem *a,const struct hash_elem *b, void *aux UNUSED);
 
 /* evoked in thread_create */
-bool page_table_init(struct hash *hash, hash_hash_func *hash_func, hash_less_func *less_func);
+bool page_table_init(struct hash *hash);
 
 /* evoked in thread_exit */
-void page_table_destroy(struct hash *hash, hash_action_func *action);
+void page_table_destroy(struct hash *hash);
 
 
 #endif //PINTOS_PAGE_H

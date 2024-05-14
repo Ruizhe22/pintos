@@ -22,6 +22,9 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+#include "vm/swap.h"
+#include "vm/frame.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -126,6 +129,8 @@ pintos_init (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
+  frame_table_init();
+  swap_init();
 
   printf ("Boot complete.\n");
   

@@ -40,7 +40,7 @@ void frame_table_init()
 }
 
 /* used in function load_page() */
-struct frame *alloc_frame()
+struct frame *allot_frame()
 {
     struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
     void *kpage_tmp = palloc_get_page(PAL_USER);
