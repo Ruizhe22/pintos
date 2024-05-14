@@ -87,7 +87,6 @@ struct frame *select_frame_to_evict()
  * */
 bool save_frame(struct frame *frame)
 {
-    //frame_table_lock_acquire();
     /* the order of statements bellow can't be change! */
     if(frame->page->writable){
         frame->page->status = PAGE_SWAP;
@@ -100,7 +99,6 @@ bool save_frame(struct frame *frame)
         pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
         return true;
     }
-    //frame_table_lock_release();
 }
 
 /* put frame back to the user pool
