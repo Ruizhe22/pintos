@@ -114,12 +114,15 @@ void evict_frame(struct frame *frame)
     free(frame);
 }
 
-/* evoked in page_table_destroy when thread exit */
+/* evoked in page_table_destroy when thread exit
+ * equals to evict_frame() plus pagedir_clear_page()
+ * */
 void destroy_frame (struct frame *frame)
 {
     list_remove(&frame->elem);
-    palloc_free_page(frame->kpage);
-    pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
+    /* these two must occur or miss at the same time */
+    //palloc_free_page(frame->kpage);
+    //pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
     frame->page->frame = NULL;
     free(frame);
 }
