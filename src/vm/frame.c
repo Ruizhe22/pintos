@@ -82,6 +82,8 @@ struct frame *select_frame_to_evict()
 
 /* save frame content before evict it
  * mark page and frame as unavailable
+ * have a semantic that once content be saved, can't be access!
+ * so it flip the status, and clear pd.
  * */
 bool save_frame(struct frame *frame)
 {
@@ -104,6 +106,7 @@ bool save_frame(struct frame *frame)
 /* put frame back to the user pool
  * remove frame entry from frame table
  * unlink frame and page
+ * it assume that before being called, page status and pd is clear.
  **/
 void evict_frame(struct frame *frame)
 {
@@ -113,11 +116,13 @@ void evict_frame(struct frame *frame)
     free(frame);
 }
 
+/* evoked in page_table_destroy when thread exit */
 void destroy_frame (struct frame *frame)
 {
     list_remove(&frame->elem);
     palloc_free_page(frame->kpage);
     pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
+    frame->page->frame = NULL;
     free(frame);
 }
 
