@@ -54,7 +54,7 @@ static void page_destroy_action_func(struct hash_elem *e, void *aux UNUSED)
     struct page *page = hash_entry(e, struct page, hash_elem);
     if (page->status == PAGE_FRAME)
     {
-        evict_frame(page->frame);
+        destroy_frame(page->frame);
     }
     free(page);
 }
@@ -121,17 +121,15 @@ struct page *find_page(struct hash *page_table, void *user_addr)
 bool load_page(struct page *page)
 {
     frame_table_lock_acquire();
-    if(page->status == PAGE_FRAME) {
+    if(page->status == PAGE_FRAME || pagedir_get_page(page->thread->pagedir, page->upage) != NULL) {
         frame_table_lock_release();
         return true;
     }
     else {
-
         struct frame *frame = allot_frame();
         link_page_frame(page, frame);
-
         if (page->status == PAGE_SWAP) {
-            if(!load_page_from_swap(page,frame)) {
+            if(!load_page_from_swap(page, frame)) {
                 frame_table_lock_release();
                 return false;
             }
@@ -142,16 +140,15 @@ bool load_page(struct page *page)
             }
         }
 
-        /* enable the page */
-        if (pagedir_get_page(page->thread->pagedir, page->upage) != NULL
-                || !pagedir_set_page(page->thread->pagedir, page->upage, frame->kpage, page->writable)) {
+        /* enable user page dir */
+        if (!pagedir_set_page(page->thread->pagedir, page->upage, frame->kpage, page->writable)){
+            ASSERT(false);
             evict_frame(frame);
             frame_table_lock_release();
             return false;
         }
         page->status = PAGE_FRAME;
         page->frame->pin = false;
-
         frame_table_lock_release();
         return true;
     }
@@ -181,6 +178,7 @@ bool load_page_from_file(struct page *page, struct frame *frame)
     struct page_file *pfile = &page->file;
     file_seek(pfile->file, pfile->file_offset);
     void *kpage = frame->kpage;
+    void *upage = page->upage;
     if (file_read(pfile->file, kpage, pfile->read_bytes) != (int) pfile->read_bytes) {
         evict_frame(frame);
         return false;
@@ -189,9 +187,11 @@ bool load_page_from_file(struct page *page, struct frame *frame)
     return true;
 }
 
+
+
 bool load_page_from_swap(struct page *page, struct frame *frame)
 {
-    read_swap(page);
+    read_swap(page,frame);
     return true;
 }
 

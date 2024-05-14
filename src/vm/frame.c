@@ -57,7 +57,7 @@ struct frame *allot_frame()
 
 struct frame *select_frame_to_evict()
 {
-    frame_table_lock_acquire();
+    //frame_table_lock_acquire();
     struct list_elem *e = list_begin(&frame_table);
     struct frame *frame = list_entry(e, struct frame, elem);
     /* clock algorithm */
@@ -76,7 +76,7 @@ struct frame *select_frame_to_evict()
         }
         frame = list_entry(e, struct frame, elem);
     }
-
+    //frame_table_lock_release();
     return frame;
 }
 
@@ -85,12 +85,12 @@ struct frame *select_frame_to_evict()
  * */
 bool save_frame(struct frame *frame)
 {
-    frame_table_lock_acquire();
+    //frame_table_lock_acquire();
     /* the order of statements bellow can't be change! */
     if(frame->page->writable){
         frame->page->status = PAGE_SWAP;
+        write_swap(frame->page, frame);
         pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
-        write_swap(frame->page);
         return true;
     }
     else {
@@ -98,7 +98,7 @@ bool save_frame(struct frame *frame)
         pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
         return true;
     }
-    frame_table_lock_release();
+    //frame_table_lock_release();
 }
 
 /* put frame back to the user pool
@@ -107,13 +107,20 @@ bool save_frame(struct frame *frame)
  **/
 void evict_frame(struct frame *frame)
 {
-    frame_table_lock_acquire();
     list_remove(&frame->elem);
-    frame_table_lock_release();
     frame->page->frame = NULL;
     palloc_free_page(frame->kpage);
     free(frame);
 }
+
+void destroy_frame (struct frame *frame)
+{
+    list_remove(&frame->elem);
+    palloc_free_page(frame->kpage);
+    pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
+    free(frame);
+}
+
 
 void frame_table_lock_acquire()
 {

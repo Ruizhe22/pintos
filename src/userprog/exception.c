@@ -152,13 +152,13 @@ page_fault(struct intr_frame *f) {
     //printf("fault_addr no off %d\n",(int)((uintptr_t) fault_addr & ~PGMASK));
     /* Allow the pager to try to handle it. */
 
-    if (fault_addr == NULL || !not_present || !is_user_vaddr(fault_addr))
+    if (fault_addr == NULL || !not_present)
         exit (-1);
 
     struct page *page = find_page(&thread_current()->page_table, fault_addr);
-    if (page != NULL && !page->status==PAGE_FRAME) {
+
+    if (page->status!=PAGE_FRAME) {
         load_page(page);
-        //exit(-4);
     }
     else{
         if (!pagedir_get_page (thread_current()->pagedir, fault_addr))

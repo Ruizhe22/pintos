@@ -32,21 +32,10 @@
 #include "frame.h"
 
 #define SECTORS_PER_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)
-
 /* evoked in pintos init */
 void swap_init();
-
-/* select a swap slot
- * write the frame into the sector
- * set page->swap_slot
- * */
-void write_swap(struct page *page);
-
-/* swap slot is in page->swap_slot
- * read into the frame
- * clear the swap slot
- * */
-void read_swap(struct page *page);
+void read_swap(struct page *page, struct frame *frame);
+void write_swap(struct page *page, struct frame *frame);
 
 
 

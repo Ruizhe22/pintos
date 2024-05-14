@@ -12,6 +12,7 @@
 #include "page.h"
 #include "frame.h"
 
+
 struct lock swap_lock;
 struct block *swap_block_device;
 struct bitmap *swap_table;
@@ -24,12 +25,12 @@ void swap_init()
     lock_init(&swap_lock);
 }
 
-void read_swap(struct page *page)
+void read_swap(struct page *page, struct frame *frame)
 {
     lock_acquire(&swap_lock);
     bitmap_flip(swap_table, page->swap_slot);
     for (int i = 0; i < SECTORS_PER_PAGE; ++i){
-        block_read(swap_block_device, page->swap_slot * SECTORS_PER_PAGE + i, page->upage + i * BLOCK_SECTOR_SIZE);
+        block_read(swap_block_device, page->swap_slot * SECTORS_PER_PAGE + i, frame->kpage + i * BLOCK_SECTOR_SIZE);
     }
     lock_release(&swap_lock);
 }
@@ -38,19 +39,20 @@ void read_swap(struct page *page)
  * write the frame into the sector
  * set page->swap_slot
  * */
-void write_swap(struct page *page)
+void write_swap(struct page *page, struct frame *frame)
 {
     lock_acquire(&swap_lock);
     size_t free_slot = bitmap_scan_and_flip(swap_table, 0, 1, 0);
+
     if (free_slot == BITMAP_ERROR){
         PANIC("Swap Partition Full");
     }
 
     for (int i = 0; i < SECTORS_PER_PAGE; ++i){
-        block_write(swap_block_device, free_slot * SECTORS_PER_PAGE + i, page->upage + i * BLOCK_SECTOR_SIZE);
+        block_write(swap_block_device, free_slot * SECTORS_PER_PAGE + i, frame->kpage + i * BLOCK_SECTOR_SIZE);
     }
-
     page->swap_slot = free_slot;
+    page->status = PAGE_SWAP;
+    //printf("get here %d\n", free_slot);
     lock_release(&swap_lock);
-
 }

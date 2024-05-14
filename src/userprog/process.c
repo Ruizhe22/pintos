@@ -152,8 +152,7 @@ void
 process_exit(void) {
     struct thread *cur = thread_current();
     uint32_t *pd;
-
-    //page_table_destroy(&cur->page_table);
+    page_table_destroy(&cur->page_table);
     /* Destroy the current process's page directory and switch back
        to the kernel-only page directory. */
     pd = cur->pagedir;

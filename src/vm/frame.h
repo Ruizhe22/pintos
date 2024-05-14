@@ -54,7 +54,7 @@ bool save_frame(struct frame *frame);
  * unlink frame and page
  * */
 void evict_frame(struct frame *frame);
-
+void destroy_frame (struct frame *frame);
 /* global frame table lock  */
 void frame_table_lock_acquire();
 void frame_table_lock_release();

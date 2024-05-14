@@ -102,6 +102,7 @@ merge (void)
       if ((++mp[min] - buf1) % CHUNK_SIZE == 0)
         mp[min] = mp[--mp_left]; 
     }
+
 }
 
 static void
