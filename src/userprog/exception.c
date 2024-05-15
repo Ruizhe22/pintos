@@ -2,12 +2,14 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "threads/vaddr.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/syscall.h"
 #include "vm/swap.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/stack.h"
 /** Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -156,10 +158,12 @@ page_fault(struct intr_frame *f) {
         exit(-1);
     }
 
-    if(fault_addr < pg_round_down(f->esp))
     struct page *page = find_page(&thread_current()->page_table, fault_addr);
-    if (page->status!=PAGE_FRAME) {
+    if (page) {
         load_page(page);
+    }
+    else if(stack_addr(f->esp, fault_addr)){
+        stack_load(pg_round_down(fault_addr));
     }
     else{
         if (!pagedir_get_page (thread_current()->pagedir, fault_addr))

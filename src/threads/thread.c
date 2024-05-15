@@ -317,7 +317,7 @@ thread_exit(void) {
     /* set the status of the struct child of its own, and sema_up the semaphore
      * because it maybe used by its parent after it exits */
     cur->as_child->exited = true;
-
+    sema_up(&cur->as_child->sema);
     /* cleanup child threads' child structs */
     l = &cur->children;
     for (e = list_begin (l); e != list_end (l); e = ne)
@@ -339,7 +339,6 @@ thread_exit(void) {
     }
 
     cur->status = THREAD_DYING;
-    sema_up(&cur->as_child->sema);
     schedule();
     NOT_REACHED();
 }

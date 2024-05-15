@@ -14,10 +14,11 @@
 #include "vm/swap.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/stack.h"
 
 static void syscall_handler(struct intr_frame *);
 
-static bool check_pointer(const void *);
+static bool check_pointer(struct intr_frame *, const void *);
 
 
 void
@@ -61,7 +62,7 @@ static void (*syscalls[])(struct intr_frame *) = {
 static void
 syscall_handler(struct intr_frame *f) {
     int num;
-    if(check_pointer(f->esp)){
+    if(check_pointer(f, f->esp)){
         num = *(int *)(f->esp);
         if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
             syscalls[num](f);
@@ -77,16 +78,17 @@ syscall_handler(struct intr_frame *f) {
 
 /** use the first method to check if address provided by the user is safe and legal */
 static bool
-check_pointer(const void *vaddr)
+check_pointer(struct intr_frame *f, const void *vaddr)
 {
-    if (!is_user_vaddr(vaddr) || vaddr < USER_VADDR_BOTTOM)
-    {
+    if (!is_user_vaddr(vaddr) || vaddr < USER_VADDR_BOTTOM){
         return false;
     }
     struct page *page = find_page(&thread_current()->page_table, vaddr);
-    if (page)
-    {
+    if (page){
         load_page(page);
+    }
+    else if(stack_addr(f->esp, vaddr)){
+        stack_load(pg_round_down(vaddr));
     }
     void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
     if (!ptr)
@@ -137,7 +139,7 @@ static void
 sys_exit(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(check_pointer(arg)){
+    if(check_pointer(f,arg)){
         exit(*arg);
     }
     else{
@@ -156,7 +158,7 @@ static void sys_exec(struct intr_frame *f)
 {
     char **arg = f->esp + 4;
 
-    if(check_pointer(arg) && check_pointer(*arg)){
+    if(check_pointer(f,arg) && check_pointer(f,*arg)){
         filesys_lock_acquire();
         f->eax = exec(*arg);
         filesys_lock_release();
@@ -177,7 +179,7 @@ wait(tid_t pid)
 static void sys_wait(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(check_pointer(arg)){
+    if(check_pointer(f,arg)){
         f->eax = wait(*arg);
     }
     else{
@@ -198,7 +200,7 @@ sys_create(struct intr_frame *f)
 {
     char **arg1 = f->esp + 4;
     unsigned *arg2 = f->esp + 8;
-    if(check_pointer(arg1) && check_pointer(*arg1) && check_pointer(arg2)){
+    if(check_pointer(f,arg1) && check_pointer(f,*arg1) && check_pointer(f,arg2)){
         filesys_lock_acquire();
         f->eax = create(*arg1, *arg2);
         filesys_lock_release();
@@ -220,7 +222,7 @@ static void
 sys_remove(struct intr_frame *f)
 {
     char **arg = f->esp + 4;
-    if(check_pointer(arg) && check_pointer(*arg)){
+    if(check_pointer(f, arg) && check_pointer(f, *arg)){
         filesys_lock_acquire();
         f->eax = remove(*arg);
         filesys_lock_release();
@@ -245,7 +247,7 @@ open(const char *file)
 static void sys_open(struct intr_frame *f)
 {
     char **arg = f->esp + 4;
-    if(check_pointer(arg) && check_pointer(*arg)){
+    if(check_pointer(f, arg) && check_pointer(f, *arg)){
         filesys_lock_acquire();
         f->eax = open(*arg);
         filesys_lock_release();
@@ -272,7 +274,7 @@ filesize(int fd)
 static void sys_filesize(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(check_pointer(arg)){
+    if(check_pointer(f, arg)){
         filesys_lock_acquire();
         f->eax = filesize(*arg);
         filesys_lock_release();
@@ -313,7 +315,7 @@ sys_read(struct intr_frame *f)
     void **arg2 = f->esp + 8;
     unsigned *arg3 = f->esp + 12;
 
-    if(check_pointer(arg1) && check_pointer(arg2) && check_pointer(*arg2) && check_pointer(arg3) ){
+    if(check_pointer(f, arg1) && check_pointer(f, arg2) && check_pointer(f, *arg2) && check_pointer(f, arg3) ){
         filesys_lock_acquire();
         f->eax = read(*arg1, *arg2, *arg3);
         filesys_lock_release();
@@ -351,7 +353,7 @@ sys_write(struct intr_frame *f)
     void **arg2 = f->esp + 8;
     unsigned *arg3 = f->esp + 12;
 
-    if(check_pointer(arg1) && check_pointer(arg2) && check_pointer(*arg2) && check_pointer(arg3) ){
+    if(check_pointer(f, arg1) && check_pointer(f, arg2) && check_pointer(f, *arg2) && check_pointer(f, arg3) ){
         filesys_lock_acquire();
         f->eax = write(*arg1, *arg2, *arg3);
         filesys_lock_release();
@@ -379,7 +381,7 @@ sys_seek(struct intr_frame *f)
 {
     int *arg1 = f->esp + 4;
     unsigned *arg2 = f->esp + 8;
-    if(check_pointer(arg1) && check_pointer(arg2)){
+    if(check_pointer(f, arg1) && check_pointer(f, arg2)){
         filesys_lock_acquire();
         seek(*arg1, *arg2);
         filesys_lock_release();
@@ -406,7 +408,7 @@ static void
 sys_tell(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(check_pointer(arg)){
+    if(check_pointer(f, arg)){
         filesys_lock_acquire();
         f->eax = tell(*arg);
         filesys_lock_release();
@@ -435,7 +437,7 @@ static void
 sys_close(struct intr_frame *f)
 {
     int *arg = f->esp + 4;
-    if(check_pointer(arg)){
+    if(check_pointer(f, arg)){
         filesys_lock_acquire();
         close(*arg);
         filesys_lock_release();

@@ -22,5 +22,5 @@
 
 void stack_allot_load(void *upage);
 bool stack_addr(void *esp, void *addr);
-
+void stack_load(void *upage);
 #endif //PINTOS_STACK_H
