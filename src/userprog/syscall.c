@@ -452,6 +452,10 @@ sys_close(struct intr_frame *f)
     }
 }
 
+/** map a file to page, lazy load.
+ * a little different from other syscall where not check addr in sys_mmap,
+ * checking addr is left to creat_insert_mmap(), because there are much more limits about the addr.
+ * */
 
 mapid_t
 mmap(int fd, void *addr)
@@ -482,14 +486,44 @@ sys_mmap(struct intr_frame *f)
 
 
 
-
+/** closes the file descriptor associated with the given file descriptor ID,
+ * removes the file descriptor from the list, and frees the struct's memory.
+ */
 void
 munmap(mapid_t mapid)
 {
-    return;
+    struct thread *thread = thread_current();
+    struct mmap *the_mmap = find_mmap(&thread->mmap_table, mapid);
+    if(the_mmap == NULL) return;
+    void *upage = the_mmap->start_upage;
+    for(int i = 0; i < the_mmap->page_volume; ++i){
+        struct page *page = find_page(&thread->page_table, upage);
+        if(page == NULL) continue;
+        if (page->status == PAGE_FRAME && page->frame) {
+            if(pagedir_is_dirty (thread->pagedir, page->upage)){
+                filesys_lock_release();
+                write_mmap(page, page->frame);
+                filesys_lock_acquire();
+            }
+            pagedir_clear_page(thread->pagedir, page->upage);
+            evict_frame(page->frame);
+        }
+        hash_delete(&thread->page_table, &page->hash_elem);
+        free(page);
+        upage += PGSIZE;
+    }
+    hash_delete(&thread->mmap_table, &the_mmap->hash_elem);
 }
 
 static void sys_munmap(struct intr_frame *f)
 {
-    return;
+    int *arg1 = f->esp + 4;
+    if(check_pointer(f, arg1)){
+        filesys_lock_acquire();
+        munmap(*arg1);
+        filesys_lock_release();
+    }
+    else{
+        exit(-1);
+    }
 }

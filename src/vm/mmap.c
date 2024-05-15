@@ -119,8 +119,17 @@ bool check_mmap_valid(int length, int page_volume, void *addr)
 void write_mmap(struct page *page, struct frame *frame)
 {
     filesys_lock_acquire();
-    file_write_at(page->file.file, frame->kpage,
+    file_write_at(page->file.file, page->upage,
                   page->file.read_bytes,
                   page->file.file_offset);
     filesys_lock_release();
+}
+
+struct mmap *find_mmap(struct hash *mmap_table, mapid_t map_id)
+{
+    struct mmap mmap_tmp;
+    mmap_tmp.map_id = map_id;
+    struct hash_elem *e = hash_find(mmap_table, &mmap_tmp.hash_elem);
+    if (!e) return NULL;
+    else return hash_entry(e, struct mmap, hash_elem);
 }

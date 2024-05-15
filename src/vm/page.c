@@ -27,6 +27,7 @@
 #include "userprog/syscall.h"
 #include "frame.h"
 #include "swap.h"
+#include "mmap.h"
 
 
 unsigned page_hash_func (const struct hash_elem *e, void *aux UNUSED)
@@ -54,6 +55,9 @@ static void page_destroy_action_func(struct hash_elem *e, void *aux UNUSED)
     struct page *page = hash_entry(e, struct page, hash_elem);
     if (page->status == PAGE_FRAME && page->frame)
     {
+        if(page->property == PAGE_MMAP && pagedir_is_dirty (page->thread->pagedir, page->upage)) {
+            write_mmap(page, page->frame);
+        }
         destroy_frame(page->frame);
     }
     free(page);

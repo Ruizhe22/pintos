@@ -98,7 +98,6 @@ bool save_frame(struct frame *frame)
     else if(frame->page->property == PAGE_MMAP){
         frame->page->status = PAGE_FILE;
         if(pagedir_is_dirty (frame->thread->pagedir, frame->page->upage)){
-            /* to define it in mmap.c */
             write_mmap(frame->page, frame);
         }
         pagedir_clear_page(frame->thread->pagedir, frame->page->upage);

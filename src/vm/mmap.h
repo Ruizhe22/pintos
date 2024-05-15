@@ -53,4 +53,6 @@ bool check_mmap_valid(int length, int page_volume, void *addr);
 
 void write_mmap(struct page *page, struct frame *frame);
 
+struct mmap *find_mmap(struct hash *mmap_table, mapid_t map_id);
+
 #endif //PINTOS_MMAP_H

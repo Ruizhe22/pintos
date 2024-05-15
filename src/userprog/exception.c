@@ -166,7 +166,7 @@ page_fault(struct intr_frame *f) {
         stack_load(pg_round_down(fault_addr));
     }
     else{
-        if (!pagedir_get_page (thread_current()->pagedir, fault_addr))
+        //if (!pagedir_get_page (thread_current()->pagedir, fault_addr))
             exit (-1);
     }
 
