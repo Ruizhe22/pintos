@@ -52,7 +52,7 @@ bool page_table_init(struct hash *hash)
 static void page_destroy_action_func(struct hash_elem *e, void *aux UNUSED)
 {
     struct page *page = hash_entry(e, struct page, hash_elem);
-    if (page->status == PAGE_FRAME)
+    if (page->status == PAGE_FRAME && page->frame)
     {
         destroy_frame(page->frame);
     }
@@ -89,7 +89,7 @@ bool insert_page(struct hash *page_table, struct page *page)
     return (hash_insert(page_table, &page->hash_elem) == NULL);
 }
 
-struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage)
+struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage, enum page_status status)
 {
     struct page *page = (struct page *)malloc(sizeof(struct page));
     page->file.file = file;
@@ -98,7 +98,7 @@ struct page *create_insert_page(struct thread *thread, struct file *file, uint32
     page->file.zero_bytes = zero_bytes;
     page->writable = writable;
     page->upage = upage;
-    page->status = PAGE_FILE;
+    page->status = status;
     page->frame = NULL;
     page->thread = thread;
     hash_insert(&thread->page_table, &page->hash_elem);

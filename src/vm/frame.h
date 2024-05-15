@@ -39,14 +39,14 @@ struct frame {
 };
 
 /* initialize frame table and its lock */
-void frame_table_init();
+void frame_table_init(void);
 
 /* used in function load_page()
  * need to acquire new space from user pool or evict another frame.
  * construct the frame entry, only set the kpage field, !!not insert it into the frame_table.
  * */
-struct frame *allot_frame();
-struct frame *select_frame_to_evict();
+struct frame *allot_frame(void);
+struct frame *select_frame_to_evict(void);
 /* save frame content before evict it */
 bool save_frame(struct frame *frame);
 /* put frame back to the user pool
@@ -56,7 +56,7 @@ bool save_frame(struct frame *frame);
 void evict_frame(struct frame *frame);
 void destroy_frame (struct frame *frame);
 /* global frame table lock  */
-void frame_table_lock_acquire();
-void frame_table_lock_release();
+void frame_table_lock_acquire(void);
+void frame_table_lock_release(void);
 
 #endif //PINTOS_FRAME_H

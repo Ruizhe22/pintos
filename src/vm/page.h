@@ -58,7 +58,7 @@ struct page {
 struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage);
 /* insert into hash table */
 bool insert_page(struct hash *page_table, struct page *page);
-struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage);
+struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage, enum page_status status);
 
 
 struct page *find_page(struct hash *page_table, void *user_addr);

@@ -264,7 +264,7 @@ static bool load_segment(struct thread *thread, struct file *file, off_t ofs, ui
 
 /** Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
-   and its initial stack pointer into *ESP.
+   and its initial user stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
 load(char *cmd_line, void (**eip)(void), void **esp) {
@@ -487,9 +487,7 @@ load_segment(struct thread *thread, struct file *file, off_t ofs, uint8_t *upage
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
         struct page *page;
-        page = create_insert_page(thread, file, ofs, page_read_bytes, page_zero_bytes, writable, upage);
-        //printf("page %d\n",(int)page->upage);
-        //load_page(page);
+        page = create_insert_page(thread, file, ofs, page_read_bytes, page_zero_bytes, writable, upage, PAGE_FILE);
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
@@ -516,6 +514,14 @@ setup_stack(char *file_name, char *cmd_arg, void **esp) {
     if (kpage != NULL) {
         success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
         if (success) {
+            struct page *page = create_insert_page(thread_current(), NULL, 0, 0, PGSIZE, true, ((uint8_t *) PHYS_BASE) - PGSIZE, PAGE_FRAME);
+            struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
+            frame->kpage = kpage;
+            frame_table_lock_acquire();
+            link_page_frame(page,frame);
+            frame_table_lock_release();
+            frame->pin = false;
+
             *esp = PHYS_BASE - arg_size[0];
             memcpy(*esp, file_name, arg_size[0]);
             /* put arg strings on the user stack to start executing a new code file */
@@ -542,6 +548,7 @@ setup_stack(char *file_name, char *cmd_arg, void **esp) {
         } else
             palloc_free_page(kpage);
     }
+
     return success;
 }
 

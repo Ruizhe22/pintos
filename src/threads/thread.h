@@ -143,8 +143,8 @@ struct file_descriptor{
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-void filesys_lock_acquire();
-void filesys_lock_release();
+void filesys_lock_acquire(void);
+void filesys_lock_release(void);
 
 void thread_init(void);
 

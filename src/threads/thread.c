@@ -312,12 +312,11 @@ thread_exit(void) {
     }
 
     list_remove(&cur->allelem);
-    cur->status = THREAD_DYING;
+
 
     /* set the status of the struct child of its own, and sema_up the semaphore
      * because it maybe used by its parent after it exits */
     cur->as_child->exited = true;
-    sema_up(&cur->as_child->sema);
 
     /* cleanup child threads' child structs */
     l = &cur->children;
@@ -339,6 +338,8 @@ thread_exit(void) {
         free(cur->as_child);
     }
 
+    cur->status = THREAD_DYING;
+    sema_up(&cur->as_child->sema);
     schedule();
     NOT_REACHED();
 }
@@ -631,13 +632,13 @@ child_init(struct child *c, tid_t tid){
 /** These two functions are used for acquiring and releasing the file system lock. */
 
 void
-filesys_lock_acquire()
+filesys_lock_acquire(void)
 {
     lock_acquire(&filesys_lock);
 }
 
 void
-filesys_lock_release()
+filesys_lock_release(void)
 {
     lock_release(&filesys_lock);
 }

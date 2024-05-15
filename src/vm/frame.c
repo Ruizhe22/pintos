@@ -33,14 +33,14 @@ struct lock frame_table_lock;
 struct list frame_table;
 
 /* initialize frame table and its lock */
-void frame_table_init()
+void frame_table_init(void)
 {
     list_init(&frame_table);
     lock_init(&frame_table_lock);
 }
 
 /* used in function load_page() */
-struct frame *allot_frame()
+struct frame *allot_frame(void)
 {
     struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
     void *kpage_tmp = palloc_get_page(PAL_USER);
@@ -55,7 +55,7 @@ struct frame *allot_frame()
     return frame;
 }
 
-struct frame *select_frame_to_evict()
+struct frame *select_frame_to_evict(void)
 {
     //frame_table_lock_acquire();
     struct list_elem *e = list_begin(&frame_table);
@@ -128,12 +128,12 @@ void destroy_frame (struct frame *frame)
 }
 
 
-void frame_table_lock_acquire()
+void frame_table_lock_acquire(void)
 {
     lock_acquire(&frame_table_lock);
 }
 
-void frame_table_lock_release()
+void frame_table_lock_release(void)
 {
     lock_release(&frame_table_lock);
 }
