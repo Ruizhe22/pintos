@@ -106,6 +106,8 @@ struct thread {
 
     struct hash page_table;
 
+    struct hash mmap_table;
+    int map_id;
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
 };

@@ -26,6 +26,7 @@
 #include "userprog/syscall.h"
 #include "page.h"
 #include "swap.h"
+#include "mmap.h"
 
 
 /* initial in thread.c */
@@ -88,9 +89,18 @@ struct frame *select_frame_to_evict(void)
 bool save_frame(struct frame *frame)
 {
     /* the order of statements bellow can't be change! */
-    if(frame->page->writable){
+    if(frame->page->property == PAGE_EXE_WRITABLE){
         frame->page->status = PAGE_SWAP;
         write_swap(frame->page, frame);
+        pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
+        return true;
+    }
+    else if(frame->page->property == PAGE_MMAP){
+        frame->page->status = PAGE_FILE;
+        if(pagedir_is_dirty (frame->thread->pagedir, frame->page->upage)){
+            /* to define it in mmap.c */
+            write_mmap(frame->page, frame);
+        }
         pagedir_clear_page(frame->thread->pagedir, frame->page->upage);
         return true;
     }

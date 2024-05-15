@@ -66,6 +66,7 @@ vm_SRC = vm/frame.c			# Frames (physical memory)
 vm_SRC += vm/page.c                     # Pages (virtual memory)
 vm_SRC += vm/swap.c                     # Swap partition
 vm_SRC += vm/stack.c
+vm_SRC += vm/mmap.c
 
 # Filesystem code.
 filesys_SRC  = filesys/filesys.c	# Filesystem core.

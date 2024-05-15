@@ -15,6 +15,7 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 #include "vm/stack.h"
+#include "vm/mmap.h"
 
 static void syscall_handler(struct intr_frame *);
 
@@ -40,6 +41,8 @@ static void sys_write(struct intr_frame *);
 static void sys_seek(struct intr_frame *);
 static void sys_tell(struct intr_frame *);
 static void sys_close(struct intr_frame *);
+static void sys_mmap(struct intr_frame *);
+static void sys_munmap(struct intr_frame *);
 
 static void (*syscalls[])(struct intr_frame *) = {
         [SYS_HALT] = sys_halt,
@@ -54,7 +57,9 @@ static void (*syscalls[])(struct intr_frame *) = {
         [SYS_WRITE] = sys_write,
         [SYS_SEEK] = sys_seek,
         [SYS_TELL] = sys_tell,
-        [SYS_CLOSE] = sys_close
+        [SYS_CLOSE] = sys_close,
+        [SYS_MMAP] = sys_mmap,
+        [SYS_MUNMAP] = sys_munmap
 };
 
 
@@ -445,4 +450,46 @@ sys_close(struct intr_frame *f)
     else{
         exit(-1);
     }
+}
+
+
+mapid_t
+mmap(int fd, void *addr)
+{
+    if(fd == 0 || fd == 1) return -1;
+    struct file *file = fd_find(fd)->file_ptr;
+    struct mmap *mmap_t = create_insert_mmap(thread_current(),file,addr);
+    if(mmap_t==NULL) return -1;
+    mmap_set_page(mmap_t);
+    return mmap_t->map_id;
+}
+
+static void
+sys_mmap(struct intr_frame *f)
+{
+    int *arg1 = f->esp + 4;
+    void **arg2 = f->esp + 8;
+
+    if(check_pointer(f, arg1) && check_pointer(f, arg2)){
+        filesys_lock_acquire();
+        f->eax = mmap(*arg1, *arg2);
+        filesys_lock_release();
+    }
+    else{
+        exit(-1);
+    }
+}
+
+
+
+
+void
+munmap(mapid_t mapid)
+{
+    return;
+}
+
+static void sys_munmap(struct intr_frame *f)
+{
+    return;
 }

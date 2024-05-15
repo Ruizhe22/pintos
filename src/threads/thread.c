@@ -500,6 +500,7 @@ init_thread(struct thread *t, const char *name, int priority) {
     list_init(&t->children);
     list_init(&t->fd_set);
     t->executable = NULL;
+    t->map_id = 0;
     old_level = intr_disable();
     //page_table_init(&t->page_table);
     list_push_back(&all_list, &t->allelem);

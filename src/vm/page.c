@@ -68,14 +68,14 @@ void page_table_destroy(struct hash *hash)
 
 /** in process.c */
 /* evoked many times when lazy load, create struct page_file in heap */
-struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage)
+struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, enum page_property property, void *upage)
 {
     struct page *page = (struct page *)malloc(sizeof(struct page));
     page->file.file = file;
     page->file.file_offset = ofs;
     page->file.read_bytes = read_bytes;
     page->file.zero_bytes = zero_bytes;
-    page->writable = writable;
+    page->property = property;
     page->upage = upage;
     page->status = PAGE_FILE;
     page->frame = NULL;
@@ -89,14 +89,14 @@ bool insert_page(struct hash *page_table, struct page *page)
     return (hash_insert(page_table, &page->hash_elem) == NULL);
 }
 
-struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage, enum page_status status)
+struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, enum page_property property, void *upage, enum page_status status)
 {
     struct page *page = (struct page *)malloc(sizeof(struct page));
     page->file.file = file;
     page->file.file_offset = ofs;
     page->file.read_bytes = read_bytes;
     page->file.zero_bytes = zero_bytes;
-    page->writable = writable;
+    page->property = property;
     page->upage = upage;
     page->status = status;
     page->frame = NULL;
@@ -141,7 +141,7 @@ bool load_page(struct page *page)
         }
 
         /* enable user page dir */
-        if (!pagedir_set_page(page->thread->pagedir, page->upage, frame->kpage, page->writable)){
+        if (!pagedir_set_page(page->thread->pagedir, page->upage, frame->kpage, page->property)){
             ASSERT(false);
             evict_frame(frame);
             frame_table_lock_release();

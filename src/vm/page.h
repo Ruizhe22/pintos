@@ -36,6 +36,12 @@ enum page_status {
     PAGE_SWAP
 };
 
+enum page_property{
+    PAGE_EXE_READONLY = 0,
+    PAGE_EXE_WRITABLE = 1,
+    PAGE_MMAP = 2
+};
+
 struct page_file {
     struct file *file;
     uint32_t file_offset;
@@ -45,20 +51,21 @@ struct page_file {
 
 struct page {
     enum page_status status;
-    bool writable;  /* if true, when evicted, write back to swap, is false, read from file later */
+    enum page_property property;  /* if true, when evicted, write back to swap, is false, read from file later */
     void *upage;    /* user virtual address */
     struct page_file file;
     struct frame *frame;    /* avaliable when in frame */
     uint32_t swap_slot;
     struct thread *thread;
+
     struct hash_elem hash_elem;
 };
 
 /* evoked when load, create a struct page_file in heap */
-struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage);
+struct page *create_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, enum page_property property, void *upage);
 /* insert into hash table */
 bool insert_page(struct hash *page_table, struct page *page);
-struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, bool writable, void *upage, enum page_status status);
+struct page *create_insert_page(struct thread *thread, struct file *file, uint32_t ofs, uint32_t read_bytes, uint32_t zero_bytes, enum page_property property, void *upage, enum page_status status);
 
 
 struct page *find_page(struct hash *page_table, void *user_addr);

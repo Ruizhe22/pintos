@@ -22,6 +22,7 @@
 #include "vm/swap.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/mmap.h"
 static thread_func start_process
 NO_RETURN;
 
@@ -86,6 +87,7 @@ start_process(void *cmd_line_copy_) {
     struct intr_frame if_;
     bool success;
     page_table_init(&thread_current()->page_table);
+    mmap_table_init(&thread_current()->mmap_table);
     /* Initialize interrupt frame and load executable. */
     memset(&if_, 0, sizeof if_);
     if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -153,6 +155,7 @@ process_exit(void) {
     struct thread *cur = thread_current();
     uint32_t *pd;
     page_table_destroy(&cur->page_table);
+    mmap_table_destroy(&cur->mmap_table);
     /* Destroy the current process's page directory and switch back
        to the kernel-only page directory. */
     pd = cur->pagedir;
@@ -514,7 +517,7 @@ setup_stack(char *file_name, char *cmd_arg, void **esp) {
     if (kpage != NULL) {
         success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
         if (success) {
-            struct page *page = create_insert_page(thread_current(), NULL, 0, 0, PGSIZE, true, ((uint8_t *) PHYS_BASE) - PGSIZE, PAGE_FRAME);
+            struct page *page = create_insert_page(thread_current(), NULL, 0, 0, PGSIZE, PAGE_EXE_WRITABLE, ((uint8_t *) PHYS_BASE) - PGSIZE, PAGE_FRAME);
             struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
             frame->kpage = kpage;
             frame_table_lock_acquire();
