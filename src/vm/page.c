@@ -109,6 +109,7 @@ struct page *create_insert_page(struct thread *thread, struct file *file, uint32
     return page;
 }
 
+/* given a user virtual address, find the page in supplement page table */
 struct page *find_page(struct hash *page_table, void *user_addr)
 {
     struct page page_tmp;
@@ -190,8 +191,6 @@ bool load_page_from_file(struct page *page, struct frame *frame)
     memset(kpage + pfile->read_bytes, 0, pfile->zero_bytes);
     return true;
 }
-
-
 
 bool load_page_from_swap(struct page *page, struct frame *frame)
 {

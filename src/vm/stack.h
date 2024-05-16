@@ -21,6 +21,6 @@
 #define STACK_BOTTOM ((PHYS_BASE) - (STACK_LIMIT))
 
 void stack_allot_load(void *upage);
-bool stack_addr(void *esp, void *addr);
+bool stack_addr(const void *esp, const void *addr);
 void stack_load(void *upage);
 #endif //PINTOS_STACK_H

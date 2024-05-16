@@ -29,9 +29,9 @@
 #include "page.h"
 #include "swap.h"
 
-
+/** frame table entry to record information of the physical frame. */
 struct frame {
-    struct page *page;
+    struct page *page;  /* the virtyal page occupies this frame, available then the page is in frame. */
     bool pin;       /* can't be evicted, indicate page is being loaded or accessed by kernel */
     void *kpage;    /* indicate physical address */
     struct thread *thread;

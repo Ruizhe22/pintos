@@ -43,6 +43,7 @@ bool mmap_less_func (const struct hash_elem *a, const struct hash_elem *b, void 
     return am->map_id < bm->map_id;
 }
 
+/** evoked in process_start() */
 bool mmap_table_init(struct hash *hash)
 {
     return hash_init (hash, mmap_hash_func, mmap_less_func, NULL);
@@ -54,11 +55,14 @@ void mmap_destroy_action_func(struct hash_elem *e, void *aux UNUSED)
     free(m);
 }
 
+/** evoked in process_exit() */
 void mmap_table_destroy(struct hash *hash)
 {
     hash_destroy(hash, mmap_destroy_action_func);
 }
 
+/** create a struct mmap to save the information of this mmap,
+ * and insert it into the hash table mmap_table of this thread */
 struct mmap *create_insert_mmap(struct thread *thread, struct file *file, void *upage)
 {
 
@@ -76,6 +80,7 @@ struct mmap *create_insert_mmap(struct thread *thread, struct file *file, void *
     return mmap;
 }
 
+/** lazy load pages of one mmap, only add information into the supplement page table */
 bool mmap_set_page(struct mmap *mmap)
 {
     struct thread *thread = thread_current();
@@ -116,6 +121,8 @@ bool check_mmap_valid(int length, int page_volume, void *addr)
 
 }
 
+/** write back the content of the frame into file
+ * when evoked, checks have been finished. */
 void write_mmap(struct page *page, struct frame *frame)
 {
     filesys_lock_acquire();
@@ -125,6 +132,7 @@ void write_mmap(struct page *page, struct frame *frame)
     filesys_lock_release();
 }
 
+/** given a map_id,which are owned by certain thread, return a struct mmap.  */
 struct mmap *find_mmap(struct hash *mmap_table, mapid_t map_id)
 {
     struct mmap mmap_tmp;

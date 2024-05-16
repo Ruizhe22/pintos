@@ -29,13 +29,14 @@
 #include "frame.h"
 #include "swap.h"
 
-
+/* Determine whether this page is currently in memory, in a file, or in swap space. */
 enum page_status {
     PAGE_FILE,
     PAGE_FRAME,
     PAGE_SWAP
 };
 
+/* when evicted or need to write back, determines whether to write back to the file or swap space. */
 enum page_property{
     PAGE_EXE_READONLY = 0,
     PAGE_EXE_WRITABLE = 1,
@@ -49,13 +50,14 @@ struct page_file {
     uint32_t zero_bytes;
 };
 
+/** supplement page table entry type */
 struct page {
     enum page_status status;
-    enum page_property property;  /* if true, when evicted, write back to swap, is false, read from file later */
+    enum page_property property;
     void *upage;    /* user virtual address */
     struct page_file file;
     struct frame *frame;    /* avaliable when in frame */
-    uint32_t swap_slot;
+    uint32_t swap_slot;     /* avaliable when in swap */
     struct thread *thread;
 
     struct hash_elem hash_elem;

@@ -106,8 +106,8 @@ struct thread {
 
     struct hash page_table;
 
-    struct hash mmap_table;
-    int map_id;
+    struct hash mmap_table;              /**< record all mmap information. */
+    int map_id;                         /**< Alloc map id of mmap syscall. */
     /* Owned by thread.c. */
     unsigned magic;                     /**< Detects stack overflow. */
 };

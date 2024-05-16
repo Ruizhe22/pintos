@@ -30,14 +30,15 @@
 #include "frame.h"
 #include "swap.h"
 
-
+/** record information of one mmap syscall, used to lazy load and unmap pages
+ * note that it is not used in load file or wirte file, because information these funcs need is saved in struct page. */
 struct mmap{
-    void *start_upage;
-    int page_volume;
-    uint32_t read_bytes;
-    uint32_t zero_bytes;
-    mapid_t map_id;
-    struct file *file;
+    void *start_upage;   /* the addr passed by mmap_syscall, indicate the start page of the mapped contiguous space */
+    int page_volume;         /* the pages number the file need to allocate */
+    uint32_t read_bytes;      /* actual file size */
+    uint32_t zero_bytes;      /* padding */
+    mapid_t map_id;        /* corresponding to thread mapid number when syscall occurs. */
+    struct file *file;        /* the reopened struct file */
     struct hash_elem hash_elem;
 };
 

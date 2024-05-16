@@ -298,7 +298,7 @@ int
 read(int fd, void *buffer, unsigned length)
 {
     if(fd==0){
-        for(int i = 0; i < length; ++i){
+        for(unsigned i = 0; i < length; ++i){
             *(char *)(buffer+i) = input_getc();
         }
         return length;
@@ -486,8 +486,10 @@ sys_mmap(struct intr_frame *f)
 
 
 
-/** closes the file descriptor associated with the given file descriptor ID,
- * removes the file descriptor from the list, and frees the struct's memory.
+/** parse all the continuous pages of this mmap, for every page
+ * evict the frame if page is in memory frame, and save its content if dirty,
+ * then remove page from supplement page table
+ * at last remove the mmap in mmap_table;
  */
 void
 munmap(mapid_t mapid)

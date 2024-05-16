@@ -33,7 +33,7 @@
 
 #define SECTORS_PER_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)
 /* evoked in pintos init */
-void swap_init();
+void swap_init(void);
 void read_swap(struct page *page, struct frame *frame);
 void write_swap(struct page *page, struct frame *frame);
 
